@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Validación de Entradas - Auditorio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body { background: #f3f4f6; font-family: 'Segoe UI', sans-serif; color: #111827; margin:0; }
+    header { background: #1e3a8a; color: white; padding: 12px 20px; font-size: 20px; font-weight: bold; display:flex; justify-content:space-between; align-items:center; }
+    header a { color:white; font-size:16px; text-decoration:none; margin-left:20px; }
+    main { display: flex; flex-direction: row; align-items: flex-start; height: calc(100vh - 60px); }
+    .panel { background: white; border-radius: 8px; padding: 16px; margin: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow:auto; }
+    .panel.left { flex: 2; }
+    .panel.right { flex: 1; }
+    .row { display: flex; flex-direction: row; justify-content: center; margin: 4px 0; }
+    .row-label { width: 30px; font-weight: bold; margin-right: 8px; }
+    .seat { width: 32px; height: 32px; margin: 2px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: white; -webkit-user-select: none;user-select: none; }
+    .seat.disponible { background: #22c55e; }
+    .seat.vendido { background: #f59e0b; }
+    .seat.bloqueado { background: #6b7280; }
+    .seat.validado { background: #2563eb; }
+    #reader { width: 100%; margin-top: 12px; display:none; }
+    .btn { background: #1e3a8a; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Validación de Entradas</span>
+    <nav>
+      <a href="/">Volver a ventas</a>
+    </nav>
+  </header>
+  <main>
+    <section class="panel left">
+      <h2>Mapa de Asientos</h2>
+      <div id="seat-grid"></div>
+    </section>
+    <section class="panel right">
+      <h2>Escáner QR</h2>
+      <button class="btn" id="start-scan">Iniciar escaneo</button>
+      <div id="reader"></div>
+      <p id="last-scan"></p>
+    </section>
+  </main>
+
+  <script>
+    const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
+    const maxByRow = {};
+    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
+    "RSTU".split("").forEach(r=>maxByRow[r]=13);
+
+    const seatGrid = document.getElementById("seat-grid");
+    let byId = {};
+    let html5QrCode;
+
+    function seatDiv(id, status, num) {
+      const d = document.createElement("div");
+      d.className = `seat ${status}`;
+      d.id = `seat-${id}`;
+      d.textContent = num;
+      return d;
+    }
+
+    async function loadSeats() {
+      seatGrid.innerHTML = "";
+      const res = await fetch("/api/seats");
+      const data = await res.json();
+      byId = {};
+      data.forEach(s => byId[s.id] = s.status);
+
+      rows.forEach(r=>{
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "row";
+        const label = document.createElement("span");
+        label.className = "row-label";
+        label.textContent = r;
+        rowDiv.appendChild(label);
+
+        for (let n = maxByRow[r]; n >= 1; n--) {
+          const id = `${r}${n}`;
+          const status = byId[id] || "disponible";
+          rowDiv.appendChild(seatDiv(id, status, n));
+        }
+        seatGrid.appendChild(rowDiv);
+      });
+    }
+
+    async function marcarValidado(seatId) {
+  const res = await fetch("/api/validate", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ seat_id: seatId })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    const el = document.getElementById(`seat-${seatId}`);
+    if (el) {
+      el.classList.remove("disponible","vendido","bloqueado");
+      el.classList.add("validado");
+    }
+    document.getElementById("last-scan").innerText = `✅ Entrada validada: ${seatId}`;
+  } else {
+    document.getElementById("last-scan").innerText = `❌ Error: ${data.msg || "No se pudo validar"}`;
+  }
+}
+
+let escaneando = false;
+
+function onScanSuccess(decodedText) {
+  if (escaneando) return;
+  escaneando = true;
+  const seatId = decodedText.trim();
+  marcarValidado(seatId).finally(() => {
+    escaneando = false;
+  });
+}
+
+    function onScanFailure(error) {
+      // silencioso
+    }
+
+    document.getElementById("start-scan").addEventListener("click", async ()=>{
+      document.getElementById("reader").style.display = "block";
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
+      }
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length) {
+        const cameraId = devices[0].id;
+        html5QrCode.start(
+          cameraId,
+          { fps: 10, qrbox: 250 },
+          onScanSuccess,
+          onScanFailure
+        );
+      } else {
+        alert("No se encontró cámara disponible");
+      }
+    });
+
+    // Inicializar mapa
+    loadSeats();
+  </script>
+</body>
+</html>

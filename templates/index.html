@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Auditorio Padre Francisco Ibiza</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background: #f3f4f6; font-family: 'Segoe UI', sans-serif; color: #111827; margin:0; }
+    header { background: #1e3a8a; color: white; padding: 12px 20px; font-size: 20px; font-weight: bold; display:flex; justify-content:space-between; align-items:center; }
+    header a { color:white; font-size:16px; text-decoration:none; margin-left:20px; }
+    main { display: flex; flex-direction: row; align-items: flex-start; height: calc(100vh - 60px); }
+    .panel { background: white; border-radius: 8px; padding: 16px; margin: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow:auto; }
+    .panel.left { flex: 2; }
+    .panel.right { flex: 1; }
+    .row { display: flex; flex-direction: row; justify-content: center; margin: 4px 0; }
+    .row-label { width: 30px; font-weight: bold; margin-right: 8px; }
+    .seat { width: 32px; height: 32px; margin: 2px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer; color: white; -webkit-user-select: none; user-select: none;}
+    .seat.disponible { background: #22c55e; }
+    .seat.vendido { background: #f59e0b; }
+    .seat.bloqueado { background: #6b7280; cursor: not-allowed; }
+    .seat.validado { background: #2563eb; }
+    .actions { margin-top: 12px; }
+    .btn { background: #1e3a8a; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; margin-right: 6px; text-decoration:none; }
+    canvas { max-width: 100%; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Auditorio Padre Francisco Ibiza</span>
+    <nav>
+      <a href="/validar">Validar QR</a>
+    </nav>
+  </header>
+  <main>
+    <section class="panel left">
+      <h2>Venta de Entradas</h2>
+      <div id="seat-grid"></div>
+      <div class="actions">
+        <button class="btn" id="buy-btn">Confirmar compra</button>
+        <button class="btn" id="refresh-btn">Actualizar</button>
+        <a class="btn" href="/api/export.csv" download>Exportar CSV</a>
+      </div>
+      <p><em>Clic normal: seleccionar para vender.<br>
+      Alt+clic: bloquear/desbloquear.<br>
+      Ctrl+clic: desocupar asiento vendido.</em></p>
+    </section>
+    <section class="panel right">
+      <h2>Reporte</h2>
+      <div id="report"></div>
+      <canvas id="chart"></canvas>
+      <canvas id="barChart"></canvas>
+    </section>
+  </main>
+
+  <script>
+    const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
+    const maxByRow = {};
+    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
+    "RSTU".split("").forEach(r=>maxByRow[r]=13);
+
+    const seatGrid = document.getElementById("seat-grid");
+    const selected = new Set();
+    let byId = {};
+    let chart, barChart;
+
+    function seatDiv(id, status, num) {
+      const d = document.createElement("div");
+      d.className = `seat ${status}`;
+      d.textContent = num;
+
+      d.addEventListener("click", async (e) => {
+        const currentStatus = byId[id];
+
+        if (e.altKey) {
+          e.preventDefault();
+          const res = await fetch("/api/toggle_block", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ seat_id: id })
+          });
+          const data = await res.json();
+          if (data.ok) { await loadSeats(); await loadReport(); }
+          else alert(data.msg || "No se pudo cambiar el estado");
+          return;
+        }
+
+        if (e.ctrlKey) {
+          e.preventDefault();
+          if (currentStatus !== "vendido") return;
+          if (!confirm(`¿Deseas desocupar el asiento ${id}?`)) return;
+          const res = await fetch("/api/unoccupy", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ seat_id: id })
+          });
+          const data = await res.json();
+          if (data.ok) { await loadSeats(); await loadReport(); }
+          else alert(data.msg || "No se pudo desocupar");
+          return;
+        }
+
+        if (currentStatus === "disponible") {
+          if (selected.has(id)) {
+            selected.delete(id);
+            d.style.outline = "";
+          } else {
+            selected.add(id);
+            d.style.outline = "2px solid #1e3a8a";
+          }
+        }
+      });
+
+      return d;
+    }
+
+    async function loadSeats() {
+      seatGrid.innerHTML = "";
+      const res = await fetch("/api/seats");
+      const data = await res.json();
+      byId = {};
+      data.forEach(s => byId[s.id] = s.status);
+
+      rows.forEach(r=>{
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "row";
+        const label = document.createElement("span");
+        label.className = "row-label";
+        label.textContent = r;
+        rowDiv.appendChild(label);
+
+        for (let n = maxByRow[r]; n >= 1; n--) {
+          const id = `${r}${n}`;
+          const status = byId[id] || "disponible";
+          rowDiv.appendChild(seatDiv(id, status, n));
+        }
+        seatGrid.appendChild(rowDiv);
+      });
+    }
+
+    document.getElementById("refresh-btn").addEventListener("click", async ()=>{
+      selected.clear();
+      await loadSeats();
+      await loadReport();
+    });
+
+    document.getElementById("buy-btn").addEventListener("click", async ()=>{
+      if (selected.size === 0) { alert("Selecciona asientos disponibles"); return; }
+      const seats = Array.from(selected);
+      const res = await fetch("/api/buy", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({seats})
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert(data.msg || "Error al vender");
+        return;
+      }
+      alert(`Vendidos: ${data.sold.join(", ")}\nNo disponibles: ${data.unavailable.join(", ")}`);
+      selected.clear();
+      await loadSeats();
+      await loadReport();
+    });
+
+    async function loadReport() {
+      const res = await fetch("/api/report");
+      const data = await res.json();
+      const c = data.counts || {};
+      const byRow = data.by_row || [];
+
+      document.getElementById("report").innerHTML =
+        `Disponibles: ${c.disponible || 0} | Vendidos: ${c.vendido || 0} | Bloqueados: ${c.bloqueado || 0} | Validados: ${c.validado || 0}`;
+
+      // Gráfico circular
+      const pieCtx = document.getElementById("chart").getContext("2d");
+      if (chart) chart.destroy();
+      chart = new Chart(pieCtx, {
+        type: "pie",
+        data: {
+          labels: ["Disponibles", "Vendidos", "Bloqueados", "Validados"],
+          datasets: [{
+            data: [c.disponible || 0, c.vendido || 0, c.bloqueado || 0, c.validado || 0],
+            backgroundColor: ["#22c55e","#f59e0b","#6b7280","#2563eb"]
+          }]
+        },
+        options: { plugins: { legend: { position: "bottom" } } }
+      });
+
+            // Gráfico de barras por fila
+      const labels = byRow.map(r => r.row);
+      const vendidos = byRow.map(r => r.vendidos || 0);
+      const validados = byRow.map(r => r.validados || 0);
+
+      const barCtx = document.getElementById("barChart").getContext("2d");
+      if (barChart) barChart.destroy();
+      barChart = new Chart(barCtx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Vendidos",
+              data: vendidos,
+              backgroundColor: "#f59e0b"
+            },
+            {
+              label: "Validados",
+              data: validados,
+              backgroundColor: "#2563eb"
+            }
+          ]
+        },
+        options: {
+          scales: {
+            y: { beginAtZero: true, ticks: { precision:0 } }
+          }
+        }
+      });
+    }
+
+    // Inicializar al cargar la página
+    (async ()=>{
+      await loadSeats();
+      await loadReport();
+    })();
+  </script>
+</body>
+</html>
