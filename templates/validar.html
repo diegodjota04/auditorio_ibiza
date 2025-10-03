@@ -37,12 +37,15 @@
       <select id="evento-select" name="evento" class="evento-select">
         <option value="">-- Seleccione --</option>
       </select>
-      <div id="evento-img" style="margin-top:12px;">
-      <img id="evento-preview" src="" alt="Imagen del evento" style="max-width:200px; border-radius:8px;" />
+      <div id="evento-img" class="select">
+      <img id="evento-preview" src="" alt="Imagen del evento" class="evento-img" />
       </div>
       <h2>Mapa</h2>
+      <div id="escenario-label" class="escenario-label">
+        Vista desde el escenario
+      </div>
       <div id="seat-grid">Seleccione un evento</div>
-
+      
       <div id="stats-panel">
         <h3>Estadísticas en tiempo real</h3>
         <div class="chart-wrap">
@@ -157,7 +160,8 @@
       const el = document.getElementById(`seat-${seatId}`);
       if (!el) return;
       el.classList.remove("disponible", "vendido", "bloqueado");
-      el.classList.add("validado");
+      el.classList.add("validado", "flash");
+      setTimeout(() => el.classList.remove("flash"), 600);;
     }
 
     // Marcado de validación (POST al backend)

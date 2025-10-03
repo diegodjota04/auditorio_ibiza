@@ -16,13 +16,14 @@
   <h2>Fecha: {{ fecha }}</h2>
 
   <h3>Mapa de asientos</h3>
+  <div class="escenario-label">Vista desde el escenario</div>
   <div id="seat-grid">Cargando asientos...</div>
 
   <button id="comprar-btn">Comprar seleccionados</button>
   <p id="msg"></p>
 
   <script>
-    const eventoId = {{ evento_id | tojson }}
+    const eventoId = "{{ evento_id | tojson }}";
     const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
     const maxByRow = {};
     "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
@@ -87,8 +88,9 @@
         el.classList.remove("selected");
       } else {
         seleccionados.push(id);
-        el.classList.add("selected");
-      }
+        el.classList.add("selected", "flash");
+        setTimeout(() => el.classList.remove("flash"), 600);
+        }
     }
 
     document.getElementById("comprar-btn").addEventListener("click", async () => {
