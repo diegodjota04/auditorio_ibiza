@@ -11,7 +11,7 @@
     select, button { margin:10px 0; padding:8px; font-size:16px; border-radius:6px; }
     .row { display:flex; margin:4px 0; }
     .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; cursor:pointer; user-select:none; -webkit-user-select:none; }
+    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; cursor:pointer; -webkit-user-select:none; user-select:none; }
     .disponible { background:#22c55e; }
     .vendido { background:#f59e0b; }
     .bloqueado { background:#6b7280; }
@@ -26,7 +26,8 @@
   </header>
   <main>
     <h2>Seleccionar evento</h2>
-    <select id="evento-select">
+    <label for="evento-select">Seleccione un evento:</label>
+    <select id="evento-select" name="evento" title="Lista de eventos">
       <option value="">-- Seleccione --</option>
     </select>
     <h2>Mapa de asientos</h2>

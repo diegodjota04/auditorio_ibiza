@@ -12,7 +12,7 @@
     .panel { flex:1; padding:20px; overflow:auto; }
     .row { display:flex; margin:4px 0; }
     .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; user-select:none; -webkit-user-select:none; }
+    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; -webkit-user-select:none; user-select:none; }
     .disponible { background:#22c55e; }
     .vendido { background:#f59e0b; }
     .bloqueado { background:#6b7280; }
@@ -25,12 +25,13 @@
 <body>
   <header>
     <span>Validación de Entradas</span>
-    <a href="/"Volver a ventas" style="color:#e0e0ff; text-decoration:none;"></a>
+    <a href="/" style="color:#e0e0ff; text-decoration:none;">Volver a ventas</a>
   </header>
   <main>
     <section class="panel">
       <h2>Evento</h2>
-      <select id="evento-select">
+      <label for="evento-select">Seleccione un evento:</label>
+      <select id="evento-select" name="evento" title="Lista de eventos">
         <option value="">-- Seleccione --</option>
       </select>
       <h2>Mapa</h2>
