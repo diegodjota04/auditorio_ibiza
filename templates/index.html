@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
+<header>
+  <span>Auditorio P. Ibiza</span>
+  <nav>
+    <a href="/" style="color:#e0e0ff; margin-right:12px;">Inicio</a>
+    <a href="/admin" style="color:#e0e0ff; margin-right:12px;">Administración</a>
+    <a href="/validar" style="color:#e0e0ff;">Validar entradas</a>
+  </nav>
+</header>
 <head>
   <meta charset="UTF-8" />
   <title>Auditorio P. Ibiza – Selección de evento</title>
@@ -25,6 +33,10 @@
         const img = document.createElement("img");
         img.src = `/static/eventos/${ev.id}.jpg`;
         img.onerror = () => img.style.display = "none";
+        img.style.width = "200px";
+        img.style.height = "200px";
+        img.style.objectFit = "cover";
+        img.style.borderRadius = "8px";
         div.appendChild(img);
 
         const nombre = document.createElement("h3");

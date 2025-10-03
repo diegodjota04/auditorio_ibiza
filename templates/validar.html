@@ -37,7 +37,9 @@
       <select id="evento-select" name="evento" class="evento-select">
         <option value="">-- Seleccione --</option>
       </select>
-
+      <div id="evento-img" style="margin-top:12px;">
+      <img id="evento-preview" src="" alt="Imagen del evento" style="max-width:200px; border-radius:8px;" />
+      </div>
       <h2>Mapa</h2>
       <div id="seat-grid">Seleccione un evento</div>
 
@@ -96,6 +98,7 @@
         sel.addEventListener("change", () => {
           eventoId = sel.value;
           if (eventoId) {
+            document.getElementById("evento-preview").src = `/static/eventos/${eventoId}.jpg`;
             cargarAsientos();
             cargarEstadisticas();
           } else {
@@ -131,7 +134,6 @@
           label.textContent = r;
           rowDiv.appendChild(label);
 
-          // Numeración descendente como en tu versión anterior
           for (let n = maxByRow[r]; n >= 1; n--) {
             const id = `${r}${n}`;
             const status = byId[id] || "disponible";

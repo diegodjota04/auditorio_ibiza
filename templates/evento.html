@@ -37,19 +37,29 @@
         const data = await res.json();
         const byId = {};
         data.forEach(s => byId[s.id] = s.status);
+        const escenario = document.createElement("div");
 
         const grid = document.getElementById("seat-grid");
         grid.innerHTML = "";
-
+        escenario.textContent = "ESCENARIO";
+        escenario.style.textAlign = "center";
+        escenario.style.fontWeight = "bold";
+        escenario.style.margin = "12px 0";
+        escenario.style.background = "#1e3a8a";
+        escenario.style.color = "white";
+        escenario.style.padding = "6px";
+        escenario.style.borderRadius = "6px";
+        grid.appendChild(escenario);
         rows.forEach(r => {
           const rowDiv = document.createElement("div");
           rowDiv.className = "row";
+
           const label = document.createElement("span");
           label.className = "row-label";
           label.textContent = r;
           rowDiv.appendChild(label);
 
-          for (let n = 1; n <= maxByRow[r]; n++) {
+          for (let n = maxByRow[r]; n >= 1; n--) {
             const id = `${r}${n}`;
             const status = byId[id] || "disponible";
             const d = document.createElement("div");

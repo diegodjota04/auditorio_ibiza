@@ -11,9 +11,10 @@
 <body>
   <h1>Gestión de Eventos – Auditorio P. Ibiza</h1>
 
-  <div class="admin-container">
+  <div class="admin-container" style="display:flex; gap:20px;">
+  <div class="form-panel" style="flex:1; max-width:400px;">
     <!-- Formulario de creación -->
-    <div class="form-panel">
+    
       <h2>Crear nuevo evento</h2>
       <form id="evento-form" enctype="multipart/form-data">
         <label for="nombre">Nombre del evento:</label><br>
@@ -31,7 +32,8 @@
     </div>
 
     <!-- Calendario -->
-    <div class="calendar-panel">
+    <div class="calendar-panel" style="flex:2;">
+
       <h2>Calendario de eventos</h2>
       <div id="calendario"></div>
     </div>
