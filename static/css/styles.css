@@ -1,0 +1,88 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  background: #f3f4f6;
+  padding: 20px;
+}
+
+h1, h2, h3 {
+  color: #1e3a8a;
+}
+
+button {
+  background: #1e3a8a;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+input, select {
+  padding: 8px;
+  font-size: 16px;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+#msg, #edit-msg {
+  margin-top: 12px;
+  font-weight: bold;
+}
+
+#calendario .fc-event-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+#calendario img {
+  width: 100%;
+  max-height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+#modal-editar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #0008;
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+
+#modal-editar .modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 300px;
+}
+
+.seat {
+  width: 32px;
+  height: 32px;
+  margin: 2px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: white;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+main {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 60px);
+}
+
+.disponible { background: #22c55e; }
+.vendido { background: #f59e0b; }
+.bloqueado { background: #6b7280; }
+.validado { background: #2563eb; }

@@ -2,176 +2,48 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Gestión de Entradas</title>
+  <title>Auditorio P. Ibiza – Selección de evento</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f3f4f6; }
-    header { background:#1e3a8a; color:white; padding:12px 20px; font-size:20px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
-    main { padding:20px; }
-    select, button { margin:10px 0; padding:8px; font-size:16px; border-radius:6px; }
-    .row { display:flex; margin:4px 0; }
-    .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; cursor:pointer; -webkit-user-select:none; user-select:none; }
-    .disponible { background:#22c55e; }
-    .vendido { background:#f59e0b; }
-    .bloqueado { background:#6b7280; }
-    .validado { background:#2563eb; }
-    .seleccionado { outline:2px solid black; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-  <header>
-    <span>Gestión de Entradas</span>
-    <a href="/validar" style="color:#e0e0ff; text-decoration:none;">Ir a validación</a>
-  </header>
-  <main>
-    <h2>Seleccionar evento</h2>
-    <label for="evento-select">Seleccione un evento:</label>
-    <select id="evento-select" name="evento" title="Lista de eventos">
-      <option value="">-- Seleccione --</option>
-    </select>
-    <h2>Mapa de asientos</h2>
-    <div id="seat-grid">Seleccione un evento</div>
-    <div id="stats-panel">
-    <h3>Estadísticas en tiempo real</h3>
-    <div id="stats-content">Cargando...</div>
-    </div>
-    <button onclick="comprar()">Comprar seleccionados</button>
-    <p id="msg"></p>
-  </main>
+  <h1>Bienvenido al Auditorio P. Ibiza</h1>
+  <h2>Seleccione un evento para comprar entradas</h2>
+  <div id="eventos"></div>
 
   <script>
-    const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
-    const maxByRow = {};
-    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
-    "RSTU".split("").forEach(r=>maxByRow[r]=13);
-
-    let eventoId = null;
-    let seleccionados = [];
-
     async function cargarEventos() {
-      try {
-        const res = await fetch("/api/eventos");
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const eventos = await res.json();
-        const sel = document.getElementById("evento-select");
-        eventos.forEach(ev => {
-          const opt = document.createElement("option");
-          opt.value = ev.id;
-          opt.textContent = `${ev.nombre} (${ev.fecha})`;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener("change", () => {
-          eventoId = sel.value;
-          console.log("Evento seleccionado:", eventoId);
-          if (eventoId) {
-            cargarAsientos();
-          } else {
-            document.getElementById("seat-grid").innerText = "❌ No se ha seleccionado ningún evento.";
-          }
-        });
-      } catch (err) {
-        console.error("Error al cargar eventos:", err);
-        document.getElementById("seat-grid").innerText = "❌ No se pudieron cargar los eventos.";
-      }
+      const res = await fetch("/api/eventos");
+      const eventos = await res.json();
+      const contenedor = document.getElementById("eventos");
+      contenedor.innerHTML = "";
+
+      eventos.filter(ev => ev.activo).forEach(ev => {
+        const div = document.createElement("div");
+        div.className = "evento";
+
+        const img = document.createElement("img");
+        img.src = `/static/eventos/${ev.id}.jpg`;
+        img.onerror = () => img.style.display = "none";
+        div.appendChild(img);
+
+        const nombre = document.createElement("h3");
+        nombre.textContent = ev.nombre;
+        div.appendChild(nombre);
+
+        const fecha = document.createElement("p");
+        fecha.textContent = `Fecha: ${ev.fecha}`;
+        div.appendChild(fecha);
+
+        const btn = document.createElement("button");
+        btn.textContent = "Ver asientos disponibles";
+        btn.onclick = () => window.location.href = `/evento/${ev.id}`;
+        div.appendChild(btn);
+
+        contenedor.appendChild(div);
+      });
     }
-
-    async function cargarAsientos() {
-      if (!eventoId) return;
-      try {
-        const res = await fetch(`/api/seats/${eventoId}`);
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        console.log("Asientos cargados:", data);
-        const byId = {};
-        data.forEach(s => byId[s.id] = s.status);
-        const grid = document.getElementById("seat-grid");
-        grid.innerHTML = "";
-        seleccionados = [];
-
-        rows.forEach(r => {
-          const rowDiv = document.createElement("div");
-          rowDiv.className = "row";
-          const label = document.createElement("span");
-          label.className = "row-label";
-          label.textContent = r;
-          rowDiv.appendChild(label);
-
-          for (let n = maxByRow[r]; n >= 1; n--) {
-            const id = `${r}${n}`;
-            const status = byId[id] || "disponible";
-            const d = document.createElement("div");
-            d.className = `seat ${status}`;
-            d.textContent = n;
-            d.id = `seat-${id}`;
-            if (status === "disponible") {
-              d.onclick = () => toggle(id);
-            }
-            rowDiv.appendChild(d);
-          }
-          grid.appendChild(rowDiv);
-        });
-      } catch (err) {
-        console.error("Error al cargar asientos:", err);
-        document.getElementById("seat-grid").innerText = "❌ No se pudo cargar el mapa de asientos.";
-      }
-      cargarEstadisticas();
-    }
-        async function cargarEstadisticas() {
-      if (!eventoId) return;
-      try {
-        const res = await fetch(`/api/report/${eventoId}`);
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        const { counts, by_row } = data;
-
-        let html = `<p><strong>Totales:</strong> `;
-        html += Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(" | ");
-        html += `</p><table border="1" cellpadding="4"><tr><th>Fila</th><th>Total</th><th>Vendidos</th><th>Validados</th></tr>`;
-        by_row.forEach(r => {
-          html += `<tr><td>${r.row}</td><td>${r.total}</td><td>${r.vendidos}</td><td>${r.validados}</td></tr>`;
-        });
-        html += `</table>`;
-        document.getElementById("stats-content").innerHTML = html;
-      } catch (err) {
-        console.error("Error al cargar estadísticas:", err);
-        document.getElementById("stats-content").innerText = "❌ No se pudieron cargar las estadísticas.";
-      }
-    }
-
-    setInterval(cargarEstadisticas, 10000);
-    function toggle(id) {
-      const el = document.getElementById(`seat-${id}`);
-      if (seleccionados.includes(id)) {
-        seleccionados = seleccionados.filter(s => s !== id);
-        el.classList.remove("seleccionado");
-      } else {
-        seleccionados.push(id);
-        el.classList.add("seleccionado");
-      }
-    }
-
-    async function comprar() {
-      if (!eventoId || seleccionados.length === 0) {
-        document.getElementById("msg").textContent = "⚠️ Seleccione un evento y al menos un asiento.";
-        return;
-      }
-      try {
-        const res = await fetch(`/api/buy/${eventoId}`, {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ seats: seleccionados })
-        });
-        const data = await res.json();
-        document.getElementById("msg").textContent = `✅ Vendidos: ${data.sold.join(", ")} | ❌ No disponibles: ${data.unavailable.join(", ")}`;
-        cargarAsientos();
-      } catch (err) {
-        console.error("Error al comprar:", err);
-        document.getElementById("msg").textContent = "❌ Error al procesar la compra.";
-      }
-    }
-
-    cargarEventos();
+    document.addEventListener("DOMContentLoaded", cargarEventos);
   </script>
 </body>
 </html>

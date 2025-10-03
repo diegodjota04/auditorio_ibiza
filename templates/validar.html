@@ -4,80 +4,100 @@
   <meta charset="UTF-8" />
   <title>Validación de Entradas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Estilos centralizados -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <!-- QR Scanner -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; margin:0; background:#f3f4f6; }
+    /* Layout mínimo (si ya tienes styles.css, puedes mover esto allí) */
     header { background:#1e3a8a; color:white; padding:12px 20px; font-size:20px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
     main { display:flex; flex-direction:row; height:calc(100vh - 60px); }
     .panel { flex:1; padding:20px; overflow:auto; }
     .row { display:flex; margin:4px 0; }
     .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    .seat { width:32px; height:32px; margin:2px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; color:white; -webkit-user-select:none; user-select:none; }
-    .disponible { background:#22c55e; }
-    .vendido { background:#f59e0b; }
-    .bloqueado { background:#6b7280; }
-    .validado { background:#2563eb; }
     #reader { width:100%; margin-top:12px; display:none; }
     .btn { background:#1e3a8a; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; }
-    input { margin-top:12px; padding:6px; width:100%; border:1px solid #ccc; border-radius:6px; }
+    .evento-select { width:100%; }
+    .chart-wrap { display:grid; grid-template-columns: 1fr; gap:16px; margin-top:12px; }
+    @media (min-width: 900px) { .chart-wrap { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
 <body>
   <header>
     <span>Validación de Entradas</span>
-    <a href="/" style="color:#e0e0ff; text-decoration:none;">Volver a ventas</a>
+    <a href="/" class="volver-link">Volver a ventas</a>
   </header>
+
   <main>
     <section class="panel">
       <h2>Evento</h2>
       <label for="evento-select">Seleccione un evento:</label>
-      <select id="evento-select" name="evento" title="Lista de eventos">
+      <select id="evento-select" name="evento" class="evento-select">
         <option value="">-- Seleccione --</option>
       </select>
+
       <h2>Mapa</h2>
       <div id="seat-grid">Seleccione un evento</div>
+
       <div id="stats-panel">
-    <h3>Estadísticas en tiempo real</h3>
-    <div id="stats-content">Cargando...</div>
-</div>
+        <h3>Estadísticas en tiempo real</h3>
+        <div class="chart-wrap">
+          <canvas id="ocupacionChart" aria-label="Gráfica circular de ocupación" role="img"></canvas>
+          <canvas id="detalleChart" aria-label="Gráfica de barras vendidas vs validadas" role="img"></canvas>
+        </div>
+      </div>
     </section>
+
     <section class="panel">
       <h2>Escáner QR</h2>
       <button class="btn" id="start-scan">Iniciar escaneo</button>
       <div id="reader"></div>
       <p id="last-scan"></p>
+
+      <label for="manual-seat">Validación manual</label>
       <input type="text" id="manual-seat" placeholder="Ej: A10" />
-      <button class="btn" onclick="validarManual()">Validar manualmente</button>
+      <button class="btn" id="manual-btn">Validar manualmente</button>
     </section>
   </main>
 
   <script>
+    // Filas y capacidad por fila
     const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
     const maxByRow = {};
-    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
-    "RSTU".split("").forEach(r=>maxByRow[r]=13);
+    "ABCDEFGHIJKLMNOPQ".split("").forEach(r => maxByRow[r] = 16);
+    "RSTU".split("").forEach(r => maxByRow[r] = 13);
 
+    // Estado global
     let eventoId = null;
-    let html5QrCode;
+    let html5QrCode = null;
     let escaneando = false;
+    let ocupacionChart = null;
+    let detalleChart = null;
 
+    // Cargar lista de eventos
     async function cargarEventos() {
       try {
         const res = await fetch("/api/eventos");
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const eventos = await res.json();
+
         const sel = document.getElementById("evento-select");
+        sel.innerHTML = '<option value="">-- Seleccione --</option>';
+
         eventos.forEach(ev => {
           const opt = document.createElement("option");
           opt.value = ev.id;
-          opt.textContent = `${ev.nombre} (${ev.fecha})`;
+          opt.textContent = `${ev.nombre} (${ev.fecha})${ev.activo ? "" : " [inactivo]"}`;
           sel.appendChild(opt);
         });
+
         sel.addEventListener("change", () => {
           eventoId = sel.value;
-          console.log("Evento seleccionado:", eventoId);
           if (eventoId) {
             cargarAsientos();
+            cargarEstadisticas();
           } else {
             document.getElementById("seat-grid").innerText = "❌ No se ha seleccionado ningún evento.";
           }
@@ -88,26 +108,30 @@
       }
     }
 
+    // Cargar y pintar el mapa de asientos
     async function cargarAsientos() {
       if (!eventoId) return;
       try {
         const res = await fetch(`/api/seats/${eventoId}`);
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
-        console.log("Asientos cargados:", data);
+
         const byId = {};
         data.forEach(s => byId[s.id] = s.status);
+
         const grid = document.getElementById("seat-grid");
         grid.innerHTML = "";
 
         rows.forEach(r => {
           const rowDiv = document.createElement("div");
           rowDiv.className = "row";
+
           const label = document.createElement("span");
           label.className = "row-label";
           label.textContent = r;
           rowDiv.appendChild(label);
 
+          // Numeración descendente como en tu versión anterior
           for (let n = maxByRow[r]; n >= 1; n--) {
             const id = `${r}${n}`;
             const status = byId[id] || "disponible";
@@ -117,6 +141,7 @@
             d.id = `seat-${id}`;
             rowDiv.appendChild(d);
           }
+
           grid.appendChild(rowDiv);
         });
       } catch (err) {
@@ -124,30 +149,16 @@
         document.getElementById("seat-grid").innerText = "❌ No se pudo cargar el mapa de asientos.";
       }
     }
-    async function cargarEstadisticas() {
-  if (!eventoId) return;
-  try {
-    const res = await fetch(`/api/report/${eventoId}`);
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-    const data = await res.json();
-    const { counts, by_row } = data;
 
-    let html = `<p><strong>Totales:</strong> `;
-    html += Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(" | ");
-    html += `</p><table border="1" cellpadding="4"><tr><th>Fila</th><th>Total</th><th>Vendidos</th><th>Validados</th></tr>`;
-    by_row.forEach(r => {
-      html += `<tr><td>${r.row}</td><td>${r.total}</td><td>${r.vendidos}</td><td>${r.validados}</td></tr>`;
-    });
-    html += `</table>`;
-    document.getElementById("stats-content").innerHTML = html;
-  } catch (err) {
-    console.error("Error al cargar estadísticas:", err);
-    document.getElementById("stats-content").innerText = "❌ No se pudieron cargar las estadísticas.";
-  }
-}
+    // Actualizar estado visual de un asiento
+    function pintarSeatValidado(seatId) {
+      const el = document.getElementById(`seat-${seatId}`);
+      if (!el) return;
+      el.classList.remove("disponible", "vendido", "bloqueado");
+      el.classList.add("validado");
+    }
 
-setInterval(cargarEstadisticas, 10000);
-
+    // Marcado de validación (POST al backend)
     async function marcarValidado(seatId) {
       if (!eventoId || !seatId) return;
       try {
@@ -166,14 +177,14 @@ setInterval(cargarEstadisticas, 10000);
 
         const data = await res.json();
         if (data.ok) {
-          const el = document.getElementById(`seat-${seatId}`);
-          if (el) {
-            el.classList.remove("disponible","vendido","bloqueado");
-            el.classList.add("validado");
-          }
+          pintarSeatValidado(seatId);
           document.getElementById("last-scan").innerText = `✅ Entrada validada: ${seatId}`;
-          const beep = new Audio("/static/beep.mp3");
-          beep.play();
+          try {
+            const beep = new Audio("/static/beep.mp3");
+            beep.play().catch(()=>{});
+          } catch {}
+          // Refrescar estadísticas después de validar
+          cargarEstadisticas();
         } else {
           document.getElementById("last-scan").innerText = `❌ ${data.msg || "No se pudo validar"}`;
         }
@@ -183,6 +194,7 @@ setInterval(cargarEstadisticas, 10000);
       }
     }
 
+    // Callbacks del escáner
     function onScanSuccess(decodedText) {
       if (escaneando) return;
       escaneando = true;
@@ -191,18 +203,20 @@ setInterval(cargarEstadisticas, 10000);
         escaneando = false;
       });
     }
-
-    function onScanFailure(error) {
-      // silencioso
+    function onScanFailure(_error) {
+      // silencioso para no saturar la consola
     }
 
+    // Validación manual
     function validarManual() {
       const seatId = document.getElementById("manual-seat").value.trim();
       if (seatId) marcarValidado(seatId);
     }
 
-    document.getElementById("start-scan").addEventListener("click", async ()=>{
-      document.getElementById("reader").style.display = "block";
+    // Iniciar escáner
+    document.getElementById("start-scan").addEventListener("click", async () => {
+      const readerEl = document.getElementById("reader");
+      readerEl.style.display = "block";
       try {
         if (!html5QrCode) {
           html5QrCode = new Html5Qrcode("reader");
@@ -210,7 +224,7 @@ setInterval(cargarEstadisticas, 10000);
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length) {
           const cameraId = devices[0].id;
-          html5QrCode.start(
+          await html5QrCode.start(
             cameraId,
             { fps: 10, qrbox: 250 },
             onScanSuccess,
@@ -225,7 +239,72 @@ setInterval(cargarEstadisticas, 10000);
       }
     });
 
-    cargarEventos();
+    document.getElementById("manual-btn").addEventListener("click", validarManual);
+
+    // Gráficas con Chart.js
+    async function cargarEstadisticas() {
+      if (!eventoId) return;
+      try {
+        const res = await fetch(`/api/report/${eventoId}`);
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        const { counts } = data;
+
+        // Totales
+        const total = Object.values(counts || {}).reduce((a, b) => a + b, 0);
+        const vendidos = counts?.vendido || 0;
+        const validados = counts?.validado || 0;
+        const ocupados = vendidos + validados;
+        const libres = Math.max(total - ocupados, 0);
+
+        // Circular de ocupación
+        const ctx1 = document.getElementById("ocupacionChart").getContext("2d");
+        if (ocupacionChart) ocupacionChart.destroy();
+        ocupacionChart = new Chart(ctx1, {
+          type: "doughnut",
+          data: {
+            labels: ["Ocupados", "Libres"],
+            datasets: [{ data: [ocupados, libres], backgroundColor: ["#f59e0b","#22c55e"] }]
+          },
+          options: {
+            plugins: { legend: { position: "bottom" } }
+          }
+        });
+
+        // Barras vendidas vs validadas
+        const ctx2 = document.getElementById("detalleChart").getContext("2d");
+        if (detalleChart) detalleChart.destroy();
+        detalleChart = new Chart(ctx2, {
+          type: "bar",
+          data: {
+            labels: ["Vendidos", "Validados"],
+            datasets: [{
+              label: "Entradas",
+              data: [vendidos, validados],
+              backgroundColor: ["#f59e0b","#2563eb"]
+            }]
+          },
+          options: {
+            scales: {
+              y: { beginAtZero: true, precision: 0 }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      } catch (err) {
+        console.error("Error al cargar estadísticas:", err);
+      }
+    }
+
+    // Auto-refresh cada 10s
+    setInterval(() => {
+      if (eventoId) cargarEstadisticas();
+    }, 10000);
+
+    // Inicio
+    document.addEventListener("DOMContentLoaded", () => {
+      cargarEventos();
+    });
   </script>
 </body>
 </html>

@@ -74,27 +74,27 @@ def api_create_event_with_image():
 
     return jsonify({"ok": True, "evento_id": evento_id})
 
-@app.route("/api/evento/<int:evento_id>", methods=["PUT"])
-def api_editar_evento():
-    nombre = request.form.get("nombre")
-    fecha = request.form.get("fecha")
-    activo = request.form.get("activo", 1)
-    imagen = request.files.get("imagen")
+    @app.route("/api/evento/<int:evento_id>", methods=["PUT"])
+    def api_editar_evento():
+        nombre = request.form.get("nombre")
+        fecha = request.form.get("fecha")
+        activo = request.form.get("activo", 1)
+        imagen = request.files.get("imagen")
 
-    if not nombre or not fecha:
-        return jsonify({"ok": False, "msg": "Nombre y fecha requeridos"}), 400
+        if not nombre or not fecha:
+            return jsonify({"ok": False, "msg": "Nombre y fecha requeridos"}), 400
 
-    con = db_conn()
-    cur = con.cursor()
-    cur.execute("UPDATE eventos SET nombre=?, fecha=?, activo=? WHERE id=?", (nombre, fecha, activo, evento_id))
-    con.commit()
-    con.close()
+        con = db_conn()
+        cur = con.cursor()
+        cur.execute("UPDATE eventos SET nombre=?, fecha=?, activo=? WHERE id=?", (nombre, fecha, activo, evento_id))
+        con.commit()
+        con.close()
 
-    if imagen:
-        filename = secure_filename(f"{evento_id}.jpg")
-        imagen.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+        if imagen:
+            filename = secure_filename(f"{evento_id}.jpg")
+            imagen.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
-    return jsonify({"ok": True, "msg": "Evento actualizado"})
+        return jsonify({"ok": True, "msg": "Evento actualizado"})
 
 @app.route("/api/evento/<int:evento_id>", methods=["DELETE"])
 def api_eliminar_evento(evento_id):
@@ -184,6 +184,22 @@ def api_report(evento_id):
     by_row = [dict(r) for r in cur.fetchall()]
     con.close()
     return jsonify({"counts": counts, "by_row": by_row})
+
+@app.route("/evento/<int:evento_id>")
+def vista_evento(evento_id):
+    con = db_conn()
+    cur = con.cursor()
+    cur.execute("SELECT nombre, fecha FROM eventos WHERE id=? AND activo=1", (evento_id,))
+    evento = cur.fetchone()
+    con.close()
+
+    if not evento:
+        return "Evento no encontrado o inactivo", 404
+
+    return render_template("evento.html",
+                           evento_id=evento_id,
+                           nombre=evento["nombre"],
+                           fecha=evento["fecha"])
 
 # --- Archivos estáticos ---
 @app.route("/static/eventos/<path:filename>")

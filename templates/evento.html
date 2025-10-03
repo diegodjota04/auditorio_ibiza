@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ nombre }} – Auditorio P. Ibiza</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    .row { display:flex; margin:4px 0; }
+    .row-label { width:30px; font-weight:bold; margin-right:8px; }
+    .seat.selected { border:2px solid #000; }
+  </style>
+</head>
+<body>
+  <h1>{{ nombre }}</h1>
+  <h2>Fecha: {{ fecha }}</h2>
+
+  <h3>Mapa de asientos</h3>
+  <div id="seat-grid">Cargando asientos...</div>
+
+  <button id="comprar-btn">Comprar seleccionados</button>
+  <p id="msg"></p>
+
+  <script>
+    const eventoId = {{ evento_id | tojson }}
+    const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
+    const maxByRow = {};
+    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
+    "RSTU".split("").forEach(r=>maxByRow[r]=13);
+
+    let seleccionados = [];
+
+    async function cargarAsientos() {
+      try {
+        const res = await fetch(`/api/seats/${eventoId}`);
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        const byId = {};
+        data.forEach(s => byId[s.id] = s.status);
+
+        const grid = document.getElementById("seat-grid");
+        grid.innerHTML = "";
+
+        rows.forEach(r => {
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "row";
+          const label = document.createElement("span");
+          label.className = "row-label";
+          label.textContent = r;
+          rowDiv.appendChild(label);
+
+          for (let n = 1; n <= maxByRow[r]; n++) {
+            const id = `${r}${n}`;
+            const status = byId[id] || "disponible";
+            const d = document.createElement("div");
+            d.className = `seat ${status}`;
+            d.textContent = n;
+            d.id = `seat-${id}`;
+
+            if (status === "disponible") {
+              d.addEventListener("click", () => toggleSeat(id, d));
+            }
+
+            rowDiv.appendChild(d);
+          }
+          grid.appendChild(rowDiv);
+        });
+      } catch (err) {
+        console.error("Error al cargar asientos:", err);
+        document.getElementById("seat-grid").innerText = "❌ No se pudo cargar el mapa de asientos.";
+      }
+    }
+
+    function toggleSeat(id, el) {
+      if (seleccionados.includes(id)) {
+        seleccionados = seleccionados.filter(s => s !== id);
+        el.classList.remove("selected");
+      } else {
+        seleccionados.push(id);
+        el.classList.add("selected");
+      }
+    }
+
+    document.getElementById("comprar-btn").addEventListener("click", async () => {
+      if (seleccionados.length === 0) {
+        document.getElementById("msg").textContent = "⚠️ No has seleccionado asientos.";
+        return;
+      }
+      try {
+        const res = await fetch(`/api/buy/${eventoId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seats: seleccionados })
+        });
+        const data = await res.json();
+        if (data.sold && data.sold.length > 0) {
+          document.getElementById("msg").textContent = `✅ Compra realizada: ${data.sold.join(", ")}`;
+        }
+        if (data.unavailable && data.unavailable.length > 0) {
+          document.getElementById("msg").textContent += ` | ❌ No disponibles: ${data.unavailable.join(", ")}`;
+        }
+        seleccionados = [];
+        cargarAsientos();
+      } catch (err) {
+        console.error("Error en compra:", err);
+        document.getElementById("msg").textContent = "❌ Error al procesar la compra.";
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", cargarAsientos);
+  </script>
+</body>
+</html>
