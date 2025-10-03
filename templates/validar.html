@@ -25,14 +25,20 @@
 <body>
   <header>
     <span>Validación de Entradas</span>
-    <a href="/">Volver a ventas</a>
+    <a href="/"Volver a ventas" style="color:#e0e0ff; text-decoration:none;"></a>
   </header>
   <main>
     <section class="panel">
       <h2>Evento</h2>
-      <select id="evento-select"></select>
+      <select id="evento-select">
+        <option value="">-- Seleccione --</option>
+      </select>
       <h2>Mapa</h2>
-      <div id="seat-grid">Seleccione evento</div>
+      <div id="seat-grid">Seleccione un evento</div>
+      <div id="stats-panel">
+    <h3>Estadísticas en tiempo real</h3>
+    <div id="stats-content">Cargando...</div>
+</div>
     </section>
     <section class="panel">
       <h2>Escáner QR</h2>
@@ -55,49 +61,91 @@
     let escaneando = false;
 
     async function cargarEventos() {
-      const res = await fetch("/api/eventos");
-      const eventos = await res.json();
-      const sel = document.getElementById("evento-select");
-      eventos.forEach(ev => {
-        const opt = document.createElement("option");
-        opt.value = ev.id;
-        opt.textContent = `${ev.nombre} (${ev.fecha})`;
-        sel.appendChild(opt);
-      });
-      sel.addEventListener("change", () => {
-        eventoId = sel.value;
-        cargarAsientos();
-      });
+      try {
+        const res = await fetch("/api/eventos");
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const eventos = await res.json();
+        const sel = document.getElementById("evento-select");
+        eventos.forEach(ev => {
+          const opt = document.createElement("option");
+          opt.value = ev.id;
+          opt.textContent = `${ev.nombre} (${ev.fecha})`;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener("change", () => {
+          eventoId = sel.value;
+          console.log("Evento seleccionado:", eventoId);
+          if (eventoId) {
+            cargarAsientos();
+          } else {
+            document.getElementById("seat-grid").innerText = "❌ No se ha seleccionado ningún evento.";
+          }
+        });
+      } catch (err) {
+        console.error("Error al cargar eventos:", err);
+        document.getElementById("seat-grid").innerText = "❌ No se pudieron cargar los eventos.";
+      }
     }
 
     async function cargarAsientos() {
-      const res = await fetch(`/api/seats/${eventoId}`);
-      const data = await res.json();
-      const byId = {};
-      data.forEach(s => byId[s.id] = s.status);
-      const grid = document.getElementById("seat-grid");
-      grid.innerHTML = "";
+      if (!eventoId) return;
+      try {
+        const res = await fetch(`/api/seats/${eventoId}`);
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        console.log("Asientos cargados:", data);
+        const byId = {};
+        data.forEach(s => byId[s.id] = s.status);
+        const grid = document.getElementById("seat-grid");
+        grid.innerHTML = "";
 
-      rows.forEach(r => {
-        const rowDiv = document.createElement("div");
-        rowDiv.className = "row";
-        const label = document.createElement("span");
-        label.className = "row-label";
-        label.textContent = r;
-        rowDiv.appendChild(label);
+        rows.forEach(r => {
+          const rowDiv = document.createElement("div");
+          rowDiv.className = "row";
+          const label = document.createElement("span");
+          label.className = "row-label";
+          label.textContent = r;
+          rowDiv.appendChild(label);
 
-        for (let n = maxByRow[r]; n >= 1; n--) {
-          const id = `${r}${n}`;
-          const status = byId[id] || "disponible";
-          const d = document.createElement("div");
-          d.className = `seat ${status}`;
-          d.textContent = n;
-          d.id = `seat-${id}`;
-          rowDiv.appendChild(d);
-        }
-        grid.appendChild(rowDiv);
-      });
+          for (let n = maxByRow[r]; n >= 1; n--) {
+            const id = `${r}${n}`;
+            const status = byId[id] || "disponible";
+            const d = document.createElement("div");
+            d.className = `seat ${status}`;
+            d.textContent = n;
+            d.id = `seat-${id}`;
+            rowDiv.appendChild(d);
+          }
+          grid.appendChild(rowDiv);
+        });
+      } catch (err) {
+        console.error("Error al cargar asientos:", err);
+        document.getElementById("seat-grid").innerText = "❌ No se pudo cargar el mapa de asientos.";
+      }
     }
+    async function cargarEstadisticas() {
+  if (!eventoId) return;
+  try {
+    const res = await fetch(`/api/report/${eventoId}`);
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const data = await res.json();
+    const { counts, by_row } = data;
+
+    let html = `<p><strong>Totales:</strong> `;
+    html += Object.entries(counts).map(([k,v]) => `${k}: ${v}`).join(" | ");
+    html += `</p><table border="1" cellpadding="4"><tr><th>Fila</th><th>Total</th><th>Vendidos</th><th>Validados</th></tr>`;
+    by_row.forEach(r => {
+      html += `<tr><td>${r.row}</td><td>${r.total}</td><td>${r.vendidos}</td><td>${r.validados}</td></tr>`;
+    });
+    html += `</table>`;
+    document.getElementById("stats-content").innerHTML = html;
+  } catch (err) {
+    console.error("Error al cargar estadísticas:", err);
+    document.getElementById("stats-content").innerText = "❌ No se pudieron cargar las estadísticas.";
+  }
+}
+
+setInterval(cargarEstadisticas, 10000);
 
     async function marcarValidado(seatId) {
       if (!eventoId || !seatId) return;
@@ -123,6 +171,8 @@
             el.classList.add("validado");
           }
           document.getElementById("last-scan").innerText = `✅ Entrada validada: ${seatId}`;
+          const beep = new Audio("/static/beep.mp3");
+          beep.play();
         } else {
           document.getElementById("last-scan").innerText = `❌ ${data.msg || "No se pudo validar"}`;
         }
