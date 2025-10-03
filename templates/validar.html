@@ -12,8 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     /* Layout mínimo (si ya tienes styles.css, puedes mover esto allí) */
-    header { background:#1e3a8a; color:white; padding:12px 20px; font-size:20px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; }
-    main { display:flex; flex-direction:row; height:calc(100vh - 60px); }
+     main { display:flex; flex-direction:row; height:calc(100vh - 60px); }
     .panel { flex:1; padding:20px; overflow:auto; }
     .row { display:flex; margin:4px 0; }
     .row-label { width:30px; font-weight:bold; margin-right:8px; }
@@ -26,8 +25,12 @@
 </head>
 <body>
   <header>
-    <span>Validación de Entradas</span>
-    <a href="/" class="volver-link">Volver a ventas</a>
+    <span>Auditorio P. Ibiza</span>
+    <nav>
+      <a href="/" class="nav-link">Inicio</a>
+      <a href="/admin" class="nav-link">Administración</a>
+      <a href="/validar" class="nav-link">Validar entradas</a>
+    </nav>
   </header>
 
   <main>

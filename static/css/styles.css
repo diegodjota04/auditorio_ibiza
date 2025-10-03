@@ -22,11 +22,19 @@ header {
   align-items: center;
 }
 
-header nav a {
+header nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav-link {
   color: #e0e0ff;
-  margin-right: 12px;
   text-decoration: none;
   font-weight: bold;
+}
+
+.nav-link:hover {
+  text-decoration: underline;
 }
 
 /* Paneles */
