@@ -24,8 +24,12 @@
   <h2>Fecha: {{ fecha }}</h2>
 
   <h3>Mapa de asientos</h3>
-  <div class="escenario-label">Vista desde el escenario</div>
-  <div id="seat-grid">Cargando asientos...</div>
+    <div class="info-superior">
+      <img id="evento-preview" src="/static/eventos/{{ evento_id }}.jpg" alt="Imagen del evento">
+      <div id="grafico-estadisticas"></div>
+    </div>
+    <div class="escenario-label">Vista desde el escenario</div>
+    <div id="seat-grid">Seleccione un evento</div>
 
   <button id="comprar-btn">Comprar seleccionados</button>
   <p id="msg"></p>

@@ -4,24 +4,9 @@
   <meta charset="UTF-8" />
   <title>Validación de Entradas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Estilos centralizados -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <!-- QR Scanner -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    /* Layout mínimo (si ya tienes styles.css, puedes mover esto allí) */
-     main { display:flex; flex-direction:row; height:calc(100vh - 60px); }
-    .panel { flex:1; padding:20px; overflow:auto; }
-    .row { display:flex; margin:4px 0; }
-    .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    #reader { width:100%; margin-top:12px; display:none; }
-    .btn { background:#1e3a8a; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; margin-top:8px; }
-    .evento-select { width:100%; }
-    .chart-wrap { display:grid; grid-template-columns: 1fr; gap:16px; margin-top:12px; }
-    @media (min-width: 900px) { .chart-wrap { grid-template-columns: 1fr 1fr; } }
-  </style>
 </head>
 <body>
   <header>
@@ -33,30 +18,28 @@
     </nav>
   </header>
 
-  <main>
-    <section class="panel">
+  <main class="validacion-layout">
+    <section class="panel panel-izquierdo">
       <h2>Evento</h2>
       <label for="evento-select">Seleccione un evento:</label>
       <select id="evento-select" name="evento" class="evento-select">
         <option value="">-- Seleccione --</option>
       </select>
-      <div id="evento-img" class="select">
-      <img id="evento-preview" src="" alt="Imagen del evento" class="evento-img" />
-      </div>
+
       <h2>Mapa</h2>
-      <div class="escenario-label">Vista desde el escenario</div>
-      <div id="seat-grid">Seleccione un evento</div>
-      
-      <div id="stats-panel">
-        <h3>Estadísticas en tiempo real</h3>
+      <div class="info-superior">
+        <img id="evento-preview" src="" alt="Imagen del evento" class="evento-img" />
         <div class="chart-wrap">
           <canvas id="ocupacionChart" aria-label="Gráfica circular de ocupación" role="img"></canvas>
           <canvas id="detalleChart" aria-label="Gráfica de barras vendidas vs validadas" role="img"></canvas>
         </div>
       </div>
+
+      <div class="escenario-label">Vista desde el escenario</div>
+      <div id="seat-grid">Seleccione un evento</div>
     </section>
 
-    <section class="panel">
+    <section class="panel panel-derecho">
       <h2>Escáner QR</h2>
       <button class="btn" id="start-scan">Iniciar escaneo</button>
       <div id="reader"></div>
@@ -69,42 +52,36 @@
   </main>
 
   <script>
-    // Filas y capacidad por fila
     const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
     const maxByRow = {};
     "ABCDEFGHIJKLMNOPQ".split("").forEach(r => maxByRow[r] = 16);
     "RSTU".split("").forEach(r => maxByRow[r] = 13);
 
-    // Estado global
     let eventoId = null;
     let html5QrCode = null;
     let escaneando = false;
     let ocupacionChart = null;
     let detalleChart = null;
 
-    // Cargar lista de eventos
     async function cargarEventos() {
       try {
         const res = await fetch("/api/eventos");
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const eventos = await res.json();
-
         const sel = document.getElementById("evento-select");
         sel.innerHTML = '<option value="">-- Seleccione --</option>';
-
         eventos.forEach(ev => {
           const opt = document.createElement("option");
           opt.value = ev.id;
           opt.textContent = `${ev.nombre} (${ev.fecha})${ev.activo ? "" : " [inactivo]"}`;
           sel.appendChild(opt);
         });
-
-        sel.addEventListener("change", () => {
+        sel.addEventListener("change", async () => {
           eventoId = sel.value;
           if (eventoId) {
             document.getElementById("evento-preview").src = `/static/eventos/${eventoId}.jpg`;
-            cargarAsientos();
-            cargarEstadisticas();
+            await cargarAsientos();
+            await cargarEstadisticas(eventoId);
           } else {
             document.getElementById("seat-grid").innerText = "❌ No se ha seleccionado ningún evento.";
           }
@@ -115,29 +92,23 @@
       }
     }
 
-    // Cargar y pintar el mapa de asientos
     async function cargarAsientos() {
       if (!eventoId) return;
       try {
         const res = await fetch(`/api/seats/${eventoId}`);
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
-
         const byId = {};
         data.forEach(s => byId[s.id] = s.status);
-
         const grid = document.getElementById("seat-grid");
         grid.innerHTML = "";
-
         rows.forEach(r => {
           const rowDiv = document.createElement("div");
           rowDiv.className = "row";
-
           const label = document.createElement("span");
           label.className = "row-label";
           label.textContent = r;
           rowDiv.appendChild(label);
-
           for (let n = maxByRow[r]; n >= 1; n--) {
             const id = `${r}${n}`;
             const status = byId[id] || "disponible";
@@ -147,7 +118,6 @@
             d.id = `seat-${id}`;
             rowDiv.appendChild(d);
           }
-
           grid.appendChild(rowDiv);
         });
       } catch (err) {
@@ -156,16 +126,14 @@
       }
     }
 
-    // Actualizar estado visual de un asiento
     function pintarSeatValidado(seatId) {
       const el = document.getElementById(`seat-${seatId}`);
       if (!el) return;
       el.classList.remove("disponible", "vendido", "bloqueado");
       el.classList.add("validado", "flash");
-      setTimeout(() => el.classList.remove("flash"), 600);;
+      setTimeout(() => el.classList.remove("flash"), 600);
     }
 
-    // Marcado de validación (POST al backend)
     async function marcarValidado(seatId) {
       if (!eventoId || !seatId) return;
       try {
@@ -174,23 +142,20 @@
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({ seat_id: seatId })
         });
-
         if (!res.ok) {
           const text = await res.text();
           console.error("Error del servidor:", text);
           document.getElementById("last-scan").innerText = `❌ Error ${res.status}: ${text}`;
           return;
         }
-
         const data = await res.json();
         if (data.ok) {
           pintarSeatValidado(seatId);
           document.getElementById("last-scan").innerText = `✅ Entrada validada: ${seatId}`;
           try {
             const beep = new Audio("/static/beep.mp3");
-            beep.play().catch(()=>{});
+            beep.play().catch(() => {});
           } catch {}
-          // Refrescar estadísticas después de validar
           cargarEstadisticas();
         } else {
           document.getElementById("last-scan").innerText = `❌ ${data.msg || "No se pudo validar"}`;
@@ -201,26 +166,20 @@
       }
     }
 
-    // Callbacks del escáner
     function onScanSuccess(decodedText) {
       if (escaneando) return;
       escaneando = true;
       const seatId = decodedText.trim();
-      marcarValidado(seatId).finally(() => {
-        escaneando = false;
-      });
-    }
-    function onScanFailure(_error) {
-      // silencioso para no saturar la consola
+      marcarValidado(seatId).finally(() => escaneando = false);
     }
 
-    // Validación manual
+    function onScanFailure(_error) {}
+
     function validarManual() {
       const seatId = document.getElementById("manual-seat").value.trim();
       if (seatId) marcarValidado(seatId);
     }
 
-    // Iniciar escáner
     document.getElementById("start-scan").addEventListener("click", async () => {
       const readerEl = document.getElementById("reader");
       readerEl.style.display = "block";
@@ -231,12 +190,7 @@
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length) {
           const cameraId = devices[0].id;
-          await html5QrCode.start(
-            cameraId,
-            { fps: 10, qrbox: 250 },
-            onScanSuccess,
-            onScanFailure
-          );
+          await html5QrCode.start(cameraId, { fps: 10, qrbox: 250 }, onScanSuccess, onScanFailure);
         } else {
           alert("No se encontró cámara disponible");
         }
@@ -248,7 +202,6 @@
 
     document.getElementById("manual-btn").addEventListener("click", validarManual);
 
-    // Gráficas con Chart.js
     async function cargarEstadisticas() {
       if (!eventoId) return;
       try {
@@ -256,31 +209,31 @@
         if (!res.ok) throw new Error(`Error ${res.status}`);
         const data = await res.json();
         const { counts } = data;
-
-        // Totales
         const total = Object.values(counts || {}).reduce((a, b) => a + b, 0);
         const vendidos = counts?.vendido || 0;
-        const validados = counts?.validado || 0;
-        const ocupados = vendidos + validados;
-        const libres = Math.max(total - ocupados, 0);
+                const validados = counts?.validado || 0;
+        const disponibles = counts?.disponible || 0;
 
-        // Circular de ocupación
-        const ctx1 = document.getElementById("ocupacionChart").getContext("2d");
         if (ocupacionChart) ocupacionChart.destroy();
+        if (detalleChart) detalleChart.destroy();
+
+        const ctx1 = document.getElementById("ocupacionChart").getContext("2d");
         ocupacionChart = new Chart(ctx1, {
           type: "doughnut",
           data: {
-            labels: ["Ocupados", "Libres"],
-            datasets: [{ data: [ocupados, libres], backgroundColor: ["#f59e0b","#22c55e"] }]
+            labels: ["Vendidos", "Validados", "Disponibles"],
+            datasets: [{
+              data: [vendidos, validados, disponibles],
+              backgroundColor: ["#f59e0b", "#2563eb", "#22c55e"]
+            }]
           },
           options: {
-            plugins: { legend: { position: "bottom" } }
+            responsive: true,
+            maintainAspectRatio: false
           }
         });
 
-        // Barras vendidas vs validadas
         const ctx2 = document.getElementById("detalleChart").getContext("2d");
-        if (detalleChart) detalleChart.destroy();
         detalleChart = new Chart(ctx2, {
           type: "bar",
           data: {
@@ -288,14 +241,15 @@
             datasets: [{
               label: "Entradas",
               data: [vendidos, validados],
-              backgroundColor: ["#f59e0b","#2563eb"]
+              backgroundColor: ["#f59e0b", "#2563eb"]
             }]
           },
           options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-              y: { beginAtZero: true, precision: 0 }
-            },
-            plugins: { legend: { display: false } }
+              y: { beginAtZero: true }
+            }
           }
         });
       } catch (err) {
@@ -303,15 +257,7 @@
       }
     }
 
-    // Auto-refresh cada 10s
-    setInterval(() => {
-      if (eventoId) cargarEstadisticas();
-    }, 10000);
-
-    // Inicio
-    document.addEventListener("DOMContentLoaded", () => {
-      cargarEventos();
-    });
+    window.addEventListener("DOMContentLoaded", cargarEventos);
   </script>
 </body>
 </html>
