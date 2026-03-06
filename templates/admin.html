@@ -1,195 +1,243 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Panel de Administración</title>
+  <title>Panel de Administración – Auditorio P. Ibiza</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
+
 <body>
   <header>
-    <span>Auditorio P. Ibiza</span>
+    <span>🎭 Auditorio P. Ibiza</span>
     <nav>
       <a href="/" class="nav-link">Inicio</a>
       <a href="/admin" class="nav-link">Administración</a>
       <a href="/validar" class="nav-link">Validar entradas</a>
     </nav>
   </header>
-  <h1>Gestión de Eventos – Auditorio P. Ibiza</h1>
 
   <div class="admin-container">
-  <div class="form-panel">
-    <!-- Formulario de creación -->
-    
-      <h2>Crear nuevo evento</h2>
+    <!-- Panel izquierdo: formulario -->
+    <div class="form-panel">
+      <h2>➕ Crear nuevo evento</h2>
       <form id="evento-form" enctype="multipart/form-data">
-        <label for="nombre">Nombre del evento:</label><br>
-        <input type="text" id="nombre" name="nombre" placeholder="Ej: Concierto de Navidad" required /><br>
+        <label for="nombre">Nombre del evento</label>
+        <input type="text" id="nombre" name="nombre" placeholder="Ej: Concierto de Navidad" required />
 
-        <label for="fecha">Fecha:</label><br>
-        <input type="date" id="fecha" name="fecha" required /><br>
+        <label for="fecha">Fecha</label>
+        <input type="date" id="fecha" name="fecha" required />
 
-        <label for="imagen">Imagen del evento:</label><br>
-        <input type="file" id="imagen" name="imagen" accept="image/*" required /><br>
+        <label for="imagen">Imagen del evento (JPG/PNG/WebP, máx. 5 MB)</label>
+        <input type="file" id="imagen" name="imagen" accept="image/jpeg,image/png,image/webp" required />
 
-        <button type="submit">Crear evento</button>
+        <button type="submit" id="crear-btn">Crear evento</button>
       </form>
       <p id="msg"></p>
     </div>
 
-    <!-- Calendario -->
+    <!-- Panel derecho: calendario -->
     <div class="calendar-panel">
-
-      <h2>Calendario de eventos</h2>
+      <h2>📅 Calendario de eventos</h2>
       <div id="calendario"></div>
     </div>
   </div>
 
   <!-- Modal de edición -->
-  <div id="modal-editar">
+  <div id="modal-editar" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content">
-      <h3>Editar evento</h3>
-      <label for="edit-nombre">Nombre:</label>
-      <input type="text" id="edit-nombre" /><br>
-      <label for="edit-fecha">Fecha:</label>
-      <input type="date" id="edit-fecha" /><br>
-      <label for="edit-imagen">Imagen:</label>
-      <input type="file" id="edit-imagen" accept="image/*" /><br>
+      <h3 id="modal-title">✏️ Editar evento</h3>
 
-      <button onclick="guardarEdicion()">Guardar cambios</button>
-      <button onclick="reiniciarEvento()">Reiniciar evento</button>
-      <button onclick="desactivarEvento()">Desactivar evento</button>
-      <button onclick="reactivarEvento()">Reactivar evento</button>
-      <button onclick="eliminarEvento()">Eliminar evento</button>
-      <button onclick="cerrarModal()">Cancelar</button>
+      <label for="edit-nombre">Nombre</label>
+      <input type="text" id="edit-nombre" />
+
+      <label for="edit-fecha">Fecha</label>
+      <input type="date" id="edit-fecha" />
+
+      <label for="edit-imagen">Nueva imagen (opcional)</label>
+      <input type="file" id="edit-imagen" accept="image/jpeg,image/png,image/webp" />
+
       <p id="edit-msg"></p>
+
+      <div class="modal-actions">
+        <button onclick="guardarEdicion()">💾 Guardar</button>
+        <button onclick="reiniciarEvento()" class="secondary">🔄 Reiniciar</button>
+        <button onclick="desactivarEvento()" class="secondary">⏸ Desactivar</button>
+        <button onclick="reactivarEvento()" class="secondary">▶ Reactivar</button>
+        <button onclick="eliminarEvento()" class="danger">🗑 Eliminar</button>
+        <button onclick="cerrarModal()" class="secondary">✕ Cancelar</button>
+      </div>
     </div>
   </div>
 
   <script>
     let eventoEditando = null;
 
-    document.getElementById("evento-form").addEventListener("submit", async function(e) {
+    // Cerrar modal con Escape o clic fuera
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') cerrarModal();
+    });
+    document.getElementById('modal-editar').addEventListener('click', e => {
+      if (e.target === document.getElementById('modal-editar')) cerrarModal();
+    });
+
+    document.getElementById('evento-form').addEventListener('submit', async function (e) {
       e.preventDefault();
+      const btn = document.getElementById('crear-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Creando...';
       const formData = new FormData(e.target);
-      const res = await fetch("/api/create_event_with_image", { method: "POST", body: formData });
-      const data = await res.json();
-      document.getElementById("msg").textContent = data.ok ? `✅ Evento creado con ID ${data.evento_id}` : `❌ ${data.msg}`;
-      if (data.ok) e.target.reset();
-      cargarCalendario();
+      try {
+        const res = await fetch('/api/create_event_with_image', { method: 'POST', body: formData });
+        const data = await res.json();
+        const msg = document.getElementById('msg');
+        if (data.ok) {
+          msg.textContent = `✅ Evento creado (ID: ${data.evento_id})`;
+          msg.style.color = 'var(--success)';
+          e.target.reset();
+          cargarCalendario();
+        } else {
+          msg.textContent = `❌ ${data.msg}`;
+          msg.style.color = 'var(--danger)';
+        }
+      } catch (err) {
+        document.getElementById('msg').textContent = '❌ Error de red. Intenta de nuevo.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Crear evento';
+      }
     });
 
     function abrirModal(evento) {
       eventoEditando = evento;
-      document.getElementById("edit-nombre").value = evento.title;
-      document.getElementById("edit-fecha").value = evento.startStr;
-      document.getElementById("modal-editar").style.display = "flex";
+      document.getElementById('edit-nombre').value = evento.title;
+      document.getElementById('edit-fecha').value = evento.startStr;
+      document.getElementById('edit-msg').textContent = '';
+      document.getElementById('edit-imagen').value = '';
+      const modal = document.getElementById('modal-editar');
+      modal.style.display = 'flex';
+      modal.classList.add('open');
     }
 
     function cerrarModal() {
-      document.getElementById("modal-editar").style.display = "none";
-      document.getElementById("edit-msg").textContent = "";
+      const modal = document.getElementById('modal-editar');
+      modal.style.display = 'none';
+      modal.classList.remove('open');
+      document.getElementById('edit-msg').textContent = '';
     }
 
     async function guardarEdicion() {
-      const nombre = document.getElementById("edit-nombre").value.trim();
-      const fecha = document.getElementById("edit-fecha").value;
-      const imagen = document.getElementById("edit-imagen").files[0];
+      const nombre = document.getElementById('edit-nombre').value.trim();
+      const fecha = document.getElementById('edit-fecha').value;
+      const imagen = document.getElementById('edit-imagen').files[0];
+      if (!nombre || !fecha) {
+        document.getElementById('edit-msg').textContent = '⚠️ Nombre y fecha son requeridos.';
+        return;
+      }
       const formData = new FormData();
-      formData.append("nombre", nombre);
-      formData.append("fecha", fecha);
-      formData.append("activo", 1);
-      if (imagen) formData.append("imagen", imagen);
-      const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: "PUT", body: formData });
+      formData.append('nombre', nombre);
+      formData.append('fecha', fecha);
+      formData.append('activo', 1);
+      if (imagen) formData.append('imagen', imagen);
+      try {
+        const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: 'PUT', body: formData });
+        const data = await res.json();
+        const msg = document.getElementById('edit-msg');
+        if (data.ok) {
+          msg.textContent = '✅ Evento actualizado.';
+          msg.style.color = 'var(--success)';
+          setTimeout(() => { cerrarModal(); cargarCalendario(); }, 800);
+        } else {
+          msg.textContent = `❌ ${data.msg}`;
+          msg.style.color = 'var(--danger)';
+        }
+      } catch {
+        document.getElementById('edit-msg').textContent = '❌ Error de red.';
+      }
+    }
+
+    async function cambiarActivo(activo) {
+      const formData = new FormData();
+      formData.append('nombre', eventoEditando.title);
+      formData.append('fecha', eventoEditando.startStr);
+      formData.append('activo', activo);
+      const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: 'PUT', body: formData });
       const data = await res.json();
-      document.getElementById("edit-msg").textContent = data.ok ? "✅ Evento actualizado." : `❌ ${data.msg}`;
-      if (data.ok) cerrarModal(), cargarCalendario();
+      alert(data.msg || (data.ok ? 'Operación exitosa' : 'Error'));
+      cerrarModal();
+      cargarCalendario();
     }
 
     async function reiniciarEvento() {
-      if (confirm("¿Reiniciar este evento?")) {
-        const res = await fetch(`/api/evento/reset/${eventoEditando.extendedProps.id}`, { method: "POST" });
-        const data = await res.json();
-        alert(data.msg);
-        cerrarModal();
-        cargarCalendario();
-      }
+      if (!confirm('¿Reiniciar todos los asientos de este evento a "disponible"?')) return;
+      const res = await fetch(`/api/evento/reset/${eventoEditando.extendedProps.id}`, { method: 'POST' });
+      const data = await res.json();
+      alert(data.msg);
+      cerrarModal();
+      cargarCalendario();
     }
 
-    async function desactivarEvento() {
-      if (confirm("¿Desactivar este evento?")) {
-        const formData = new FormData();
-        formData.append("nombre", eventoEditando.title);
-        formData.append("fecha", eventoEditando.startStr);
-        formData.append("activo", 0);
-        const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: "PUT", body: formData });
-        const data = await res.json();
-        alert(data.msg);
-        cerrarModal();
-        cargarCalendario();
-      }
+    function desactivarEvento() {
+      if (!confirm('¿Desactivar este evento? No será visible para el público.')) return;
+      cambiarActivo(0);
     }
 
-    async function reactivarEvento() {
-      if (confirm("¿Reactivar este evento?")) {
-        const formData = new FormData();
-        formData.append("nombre", eventoEditando.title);
-        formData.append("fecha", eventoEditando.startStr);
-        formData.append("activo", 1);
-        const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: "PUT", body: formData });
-        const data = await res.json();
-        alert(data.msg);
-        cerrarModal();
-        cargarCalendario();
-      }
+    function reactivarEvento() {
+      if (!confirm('¿Reactivar este evento?')) return;
+      cambiarActivo(1);
     }
 
     async function eliminarEvento() {
-      if (confirm("¿Eliminar este evento? Esta acción no se puede deshacer.")) {
-        const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: "DELETE" });
-        const data = await res.json();
-        alert(data.msg);
-        cerrarModal();
-        cargarCalendario();
-      }
+      if (!confirm('¿Eliminar este evento permanentemente? Esta acción no se puede deshacer.')) return;
+      const res = await fetch(`/api/evento/${eventoEditando.extendedProps.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      alert(data.msg);
+      cerrarModal();
+      cargarCalendario();
     }
 
+    let calInstance = null;
+
     async function cargarCalendario() {
-      const res = await fetch("/api/eventos");
+      const res = await fetch('/api/eventos');
       const eventos = await res.json();
-      const calendarEl = document.getElementById("calendario");
-      calendarEl.innerHTML = "";
-      const calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: "dayGridMonth",
-        locale: "es",
-        headerToolbar: { left: "prev,next today", center: "title", right: "" },
+      const calendarEl = document.getElementById('calendario');
+      if (calInstance) { calInstance.destroy(); calInstance = null; }
+      calInstance = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'es',
+        height: 'auto',
+        headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
         events: eventos.map(ev => ({
           title: ev.nombre,
           start: ev.fecha,
           extendedProps: { id: ev.id, activo: ev.activo },
-          display: "block",
-          color: ev.activo == 0 ? "#999999" : "#3788d8"
+          display: 'block',
+          color: ev.activo == 0 ? '#9ca3af' : 'var(--primary-light, #2563eb)'
         })),
         eventClick: info => abrirModal(info.event),
         eventDidMount: info => {
           const id = info.event.extendedProps.id;
           const activo = info.event.extendedProps.activo;
-          const img = document.createElement("img");
+          const img = document.createElement('img');
           img.src = `/static/eventos/${id}.jpg`;
-          img.onerror = () => img.style.display = "none";
+          img.loading = 'lazy';
+          img.onerror = () => img.style.display = 'none';
           info.el.appendChild(img);
           if (!activo) {
-            info.el.style.opacity = "0.6";
-            info.el.style.textDecoration = "line-through";
+            info.el.style.opacity = '0.55';
+            info.el.style.textDecoration = 'line-through';
           }
         }
       });
-      calendar.render();
+      calInstance.render();
     }
 
-    document.addEventListener("DOMContentLoaded", cargarCalendario);
+    document.addEventListener('DOMContentLoaded', cargarCalendario);
   </script>
 </body>
+
 </html>

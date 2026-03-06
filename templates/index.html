@@ -2,59 +2,108 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Auditorio P. Ibiza – Selección de evento</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Compra entradas para los eventos del Auditorio P. Ibiza" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
   <header>
-    <span>Auditorio P. Ibiza</span>
+    <span>🎭 Auditorio P. Ibiza</span>
     <nav>
-      <a href="/" class="header">Inicio</a>
-      <a href="/admin" class="header">Administración</a>
-      <a href="/validar" class="header">Validar entradas</a>
+      <a href="/" class="nav-link">Inicio</a>
+      <a href="/admin" class="nav-link">Administración</a>
+      <a href="/validar" class="nav-link">Validar entradas</a>
     </nav>
   </header>
 
-  <h1>Bienvenido al Auditorio P. Ibiza</h1>
-  <h2>Seleccione un evento para comprar entradas</h2>
-  <div id="eventos" class="eventos-grid"></div>
+  <h1 style="padding: 28px 24px 0;">Bienvenido al Auditorio P. Ibiza</h1>
+  <p style="padding: 0 24px; color: var(--text-light); font-size:.95rem; margin:4px 0 0;">
+    Selecciona un evento para ver y reservar tus asientos.
+  </p>
+
+  <div id="eventos" class="eventos-grid">
+    <!-- Skeleton loaders -->
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+    <div class="skeleton skeleton-card"></div>
+  </div>
 
   <script>
     async function cargarEventos() {
-      const res = await fetch("/api/eventos");
-      const eventos = await res.json();
-      const contenedor = document.getElementById("eventos");
-      contenedor.innerHTML = "";
+      try {
+        const res = await fetch("/api/eventos");
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const eventos = await res.json();
+        const contenedor = document.getElementById("eventos");
+        contenedor.innerHTML = "";
 
-      eventos.filter(ev => ev.activo).forEach(ev => {
-        const div = document.createElement("div");
-        div.className = "evento";
+        const activos = eventos.filter(ev => ev.activo);
 
-        const img = document.createElement("img");
-        img.src = `/static/eventos/${ev.id}.jpg`;
-        img.onerror = () => img.style.display = "none";
-        img.style.width = "200px";
-        img.style.height = "200px";
-        img.style.objectFit = "cover";
-        img.style.borderRadius = "8px";
-        div.appendChild(img);
+        if (activos.length === 0) {
+          contenedor.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+              </svg>
+              <p>No hay eventos activos en este momento.</p>
+              <p style="font-size:.85rem;">Vuelve pronto o contacta a administración.</p>
+            </div>`;
+          return;
+        }
 
-        const nombre = document.createElement("h3");
-        nombre.textContent = ev.nombre;
-        div.appendChild(nombre);
+        activos.forEach(ev => {
+          const div = document.createElement("div");
+          div.className = "evento";
+          div.onclick = () => window.location.href = `/evento/${ev.id}`;
 
-        const fecha = document.createElement("p");
-        fecha.textContent = `Fecha: ${ev.fecha}`;
-        div.appendChild(fecha);
+          const imgWrap = document.createElement("div");
+          imgWrap.className = "evento-img-wrap";
 
-        const btn = document.createElement("button");
-        btn.textContent = "Ver asientos disponibles";
-        btn.onclick = () => window.location.href = `/evento/${ev.id}`;
-        div.appendChild(btn);
+          const img = document.createElement("img");
+          img.src = `/static/eventos/${ev.id}.jpg`;
+          img.alt = ev.nombre;
+          img.loading = "lazy";
+          img.onerror = () => {
+            imgWrap.style.background = "linear-gradient(135deg,#1e3a8a,#2563eb)";
+            imgWrap.style.display = "flex";
+            imgWrap.style.alignItems = "center";
+            imgWrap.style.justifyContent = "center";
+            imgWrap.innerHTML = `<span style="font-size:3rem;">🎭</span>`;
+          };
+          imgWrap.appendChild(img);
 
-        contenedor.appendChild(div);
-      });
+          const body = document.createElement("div");
+          body.className = "evento-body";
+
+          const nombre = document.createElement("h3");
+          nombre.textContent = ev.nombre;
+
+          // Formatear fecha legible
+          const [y, m, d] = ev.fecha.split("-");
+          const fechaFmt = new Date(parseInt(y), parseInt(m)-1, parseInt(d))
+            .toLocaleDateString("es-MX", { year:"numeric", month:"long", day:"numeric" });
+
+          const fecha = document.createElement("p");
+          fecha.textContent = `📅 ${fechaFmt}`;
+
+          const btn = document.createElement("button");
+          btn.textContent = "Ver asientos disponibles";
+          btn.onclick = (e) => { e.stopPropagation(); window.location.href = `/evento/${ev.id}`; };
+
+          body.appendChild(nombre);
+          body.appendChild(fecha);
+          body.appendChild(btn);
+          div.appendChild(imgWrap);
+          div.appendChild(body);
+          contenedor.appendChild(div);
+        });
+      } catch (err) {
+        console.error("Error al cargar eventos:", err);
+        document.getElementById("eventos").innerHTML =
+          `<p style="padding:24px;color:var(--danger);">❌ No se pudieron cargar los eventos. Intenta de nuevo.</p>`;
+      }
     }
     document.addEventListener("DOMContentLoaded", cargarEventos);
   </script>
