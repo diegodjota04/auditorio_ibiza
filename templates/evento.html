@@ -1,47 +1,90 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <title>{{ nombre }} – Auditorio P. Ibiza</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <style>
-    .row { display:flex; margin:4px 0; }
-    .row-label { width:30px; font-weight:bold; margin-right:8px; }
-    .seat.selected { border:2px solid #000; }
-  </style>
 </head>
+
+<body>
   <header>
-    <span>Auditorio P. Ibiza</span>
+    <span>🎭 Auditorio P. Ibiza</span>
     <nav>
       <a href="/" class="nav-link">Inicio</a>
       <a href="/admin" class="nav-link">Administración</a>
       <a href="/validar" class="nav-link">Validar entradas</a>
     </nav>
   </header>
-<body>
-  <h1>{{ nombre }}</h1>
-  <h2>Fecha: {{ fecha }}</h2>
 
-  <h3>Mapa de asientos</h3>
+  <div class="evento-header-info">
+    <h1>{{ nombre }}</h1>
+    <p style="color:var(--text-light); margin:0 0 12px; font-size:.95rem;">
+      📅 Fecha: {{ fecha }}
+    </p>
+  </div>
+
+  <div style="padding: 0 24px;">
+    <!-- Info superior: imagen + estadísticas -->
     <div class="info-superior">
-      <img id="evento-preview" src="/static/eventos/{{ evento_id }}.jpg" alt="Imagen del evento">
+      <img id="evento-preview" src="/static/eventos/{{ evento_id }}.jpg" alt="Imagen del evento" loading="lazy"
+        onerror="this.style.display='none'">
       <div id="grafico-estadisticas"></div>
     </div>
-    <div class="escenario-label">Vista desde el escenario</div>
-    <div id="seat-grid">Seleccione un evento</div>
 
-  <button id="comprar-btn">Comprar seleccionados</button>
-  <p id="msg"></p>
+    <!-- Leyenda -->
+    <div class="leyenda-asientos">
+      <div class="leyenda-item">
+        <span class="leyenda-chip" style="background:var(--success)"></span>Disponible
+      </div>
+      <div class="leyenda-item">
+        <span class="leyenda-chip" style="background:var(--warning)"></span>Vendido
+      </div>
+      <div class="leyenda-item">
+        <span class="leyenda-chip" style="background:var(--validado)"></span>Validado
+      </div>
+      <div class="leyenda-item">
+        <span class="leyenda-chip" style="background:var(--neutral)"></span>Bloqueado
+      </div>
+      <div class="leyenda-item">
+        <span class="leyenda-chip" style="border:2.5px solid #1e3a8a; background:var(--success)"></span>Seleccionado
+      </div>
+    </div>
+
+    <div class="escenario-wrapper">
+      <div class="escenario-label">🎬 Vista desde el escenario</div>
+    </div>
+    <div id="seat-grid">
+      <div class="skeleton" style="width:100%;max-width:560px;height:350px;border-radius:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Barra de compra -->
+  <div class="comprar-bottom">
+    <span class="seleccionados-badge" id="badge-seleccionados">
+      🪑 0 asientos seleccionados
+    </span>
+    <button id="comprar-btn" disabled>Comprar seleccionados</button>
+    <p id="msg" style="margin:0;"></p>
+  </div>
 
   <script>
-    const eventoId = "{{ evento_id | tojson }}";
-    const rows = [..."ABCDEFGHIJKLMNOPQ", ..."RSTU"];
+    const eventoId = {{ evento_id | tojson }};
+    const rows = [...'ABCDEFGHIJKLMNOPQ', ...'RSTU'];
     const maxByRow = {};
-    "ABCDEFGHIJKLMNOPQ".split("").forEach(r=>maxByRow[r]=16);
-    "RSTU".split("").forEach(r=>maxByRow[r]=13);
+    'ABCDEFGHIJKLMNOPQ'.split('').forEach(r => maxByRow[r] = 16);
+    'RSTU'.split('').forEach(r => maxByRow[r] = 13);
+    const MAX_SELECCION = 10;
 
     let seleccionados = [];
+
+    function actualizarBadge() {
+      const badge = document.getElementById('badge-seleccionados');
+      const btn = document.getElementById('comprar-btn');
+      badge.textContent = `🪑 ${seleccionados.length} asiento${seleccionados.length !== 1 ? 's' : ''} seleccionado${seleccionados.length !== 1 ? 's' : ''}`;
+      btn.disabled = seleccionados.length === 0;
+    }
 
     async function cargarAsientos() {
       try {
@@ -50,78 +93,97 @@
         const data = await res.json();
         const byId = {};
         data.forEach(s => byId[s.id] = s.status);
-        const grid = document.getElementById("seat-grid");
-        grid.innerHTML = "";
-        
-        rows.forEach(r => {
-          const rowDiv = document.createElement("div");
-          rowDiv.className = "row";
+        const grid = document.getElementById('seat-grid');
+        grid.innerHTML = '';
 
-          const label = document.createElement("span");
-          label.className = "row-label";
+        rows.forEach(r => {
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'row';
+
+          const label = document.createElement('span');
+          label.className = 'row-label';
           label.textContent = r;
           rowDiv.appendChild(label);
 
           for (let n = maxByRow[r]; n >= 1; n--) {
             const id = `${r}${n}`;
-            const status = byId[id] || "disponible";
-            const d = document.createElement("div");
+            const status = byId[id] || 'disponible';
+            const d = document.createElement('div');
             d.className = `seat ${status}`;
             d.textContent = n;
             d.id = `seat-${id}`;
+            d.title = `Asiento ${id} – ${status}`;
 
-            if (status === "disponible") {
-              d.addEventListener("click", () => toggleSeat(id, d));
+            if (status === 'disponible') {
+              d.addEventListener('click', () => toggleSeat(id, d));
             }
-
             rowDiv.appendChild(d);
           }
           grid.appendChild(rowDiv);
         });
       } catch (err) {
-        console.error("Error al cargar asientos:", err);
-        document.getElementById("seat-grid").innerText = "❌ No se pudo cargar el mapa de asientos.";
+        console.error('Error al cargar asientos:', err);
+        document.getElementById('seat-grid').innerText = '❌ No se pudo cargar el mapa de asientos.';
       }
     }
 
     function toggleSeat(id, el) {
       if (seleccionados.includes(id)) {
         seleccionados = seleccionados.filter(s => s !== id);
-        el.classList.remove("selected");
+        el.classList.remove('selected');
       } else {
-        seleccionados.push(id);
-        el.classList.add("selected", "flash");
-        setTimeout(() => el.classList.remove("flash"), 600);
+        if (seleccionados.length >= MAX_SELECCION) {
+          document.getElementById('msg').textContent = `⚠️ Máximo ${MAX_SELECCION} asientos por compra.`;
+          return;
         }
+        seleccionados.push(id);
+        el.classList.add('selected', 'flash');
+        setTimeout(() => el.classList.remove('flash'), 400);
+        document.getElementById('msg').textContent = '';
+      }
+      actualizarBadge();
     }
 
-    document.getElementById("comprar-btn").addEventListener("click", async () => {
+    document.getElementById('comprar-btn').addEventListener('click', async () => {
       if (seleccionados.length === 0) {
-        document.getElementById("msg").textContent = "⚠️ No has seleccionado asientos.";
+        document.getElementById('msg').textContent = '⚠️ No has seleccionado asientos.';
         return;
       }
+      const btn = document.getElementById('comprar-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Procesando...';
       try {
         const res = await fetch(`/api/buy/${eventoId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ seats: seleccionados })
         });
         const data = await res.json();
+        let msg = '';
         if (data.sold && data.sold.length > 0) {
-          document.getElementById("msg").textContent = `✅ Compra realizada: ${data.sold.join(", ")}`;
+          msg += `✅ Compra realizada: ${data.sold.join(', ')}`;
         }
         if (data.unavailable && data.unavailable.length > 0) {
-          document.getElementById("msg").textContent += ` | ❌ No disponibles: ${data.unavailable.join(", ")}`;
+          msg += ` | ❌ No disponibles: ${data.unavailable.join(', ')}`;
         }
+        document.getElementById('msg').textContent = msg;
         seleccionados = [];
+        actualizarBadge();
         cargarAsientos();
       } catch (err) {
-        console.error("Error en compra:", err);
-        document.getElementById("msg").textContent = "❌ Error al procesar la compra.";
+        console.error('Error en compra:', err);
+        document.getElementById('msg').textContent = '❌ Error al procesar la compra.';
+      } finally {
+        btn.textContent = 'Comprar seleccionados';
+        actualizarBadge();
       }
     });
 
-    document.addEventListener("DOMContentLoaded", cargarAsientos);
+    document.addEventListener('DOMContentLoaded', () => {
+      cargarAsientos();
+      actualizarBadge();
+    });
   </script>
 </body>
+
 </html>
