@@ -61,6 +61,7 @@
       <input type="file" id="edit-imagen" accept="image/jpeg,image/png,image/webp" />
 
       <p id="edit-msg"></p>
+      <p><a id="qr-download" class="btn" target="_blank" href="#" style="display:none;">📥 Descargar QR</a></p>
 
       <div class="modal-actions">
         <button onclick="guardarEdicion()">💾 Guardar</button>
@@ -117,6 +118,9 @@
       document.getElementById('edit-fecha').value = evento.startStr;
       document.getElementById('edit-msg').textContent = '';
       document.getElementById('edit-imagen').value = '';
+      const qrLink = document.getElementById('qr-download');
+      qrLink.href = `/api/qrs/${evento.extendedProps.id}`;
+      qrLink.style.display = 'inline-block';
       const modal = document.getElementById('modal-editar');
       modal.style.display = 'flex';
       modal.classList.add('open');
@@ -127,6 +131,7 @@
       modal.style.display = 'none';
       modal.classList.remove('open');
       document.getElementById('edit-msg').textContent = '';
+      document.getElementById('qr-download').style.display = 'none';
     }
 
     async function guardarEdicion() {

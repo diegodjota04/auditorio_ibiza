@@ -65,6 +65,7 @@
       <label for="manual-seat">ID de asiento (ej: A10)</label>
       <input type="text" id="manual-seat" placeholder="Ej: A10" autocomplete="off" />
       <button class="btn" id="manual-btn">Validar manualmente</button>
+      <button class="btn secondary" id="manual-release-btn">Liberar venta</button>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">
 
@@ -150,6 +151,33 @@
             d.textContent = n;
             d.id = `seat-${id}`;
             d.title = `${id} – ${status}`;
+            // allow releasing sold seats by clicking
+            if (status === 'vendido') {
+              d.style.cursor = 'pointer';
+              d.addEventListener('click', async () => {
+                if (!eventoId) return;
+                if (!confirm(`¿Marcar ${id} como disponible nuevamente?`)) return;
+                try {
+                  const res = await fetch(`/api/release/${eventoId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ seats: [id] })
+                  });
+                  const data = await res.json();
+                  if (data.released && data.released.includes(id)) {
+                    d.className = 'seat disponible';
+                    d.title = `${id} – disponible`;
+                    cargarEstadisticas();
+                    document.getElementById('last-scan').textContent = `🔄 ${id} liberado`;
+                    document.getElementById('last-scan').style.color = 'var(--warning)';
+                  } else {
+                    alert('No se pudo liberar el asiento.');
+                  }
+                } catch (err) {
+                  alert('Error al contactar al servidor.');
+                }
+              });
+            }
             rowDiv.appendChild(d);
           }
           grid.appendChild(rowDiv);
@@ -243,6 +271,33 @@
     });
 
     document.getElementById('manual-btn').addEventListener('click', validarManual);
+    document.getElementById('manual-release-btn').addEventListener('click', async () => {
+      const seatId = document.getElementById('manual-seat').value.trim().toUpperCase();
+      if (!seatId) return;
+      if (!confirm(`¿Liberar ${seatId} y marcar como disponible?`)) return;
+      try {
+        const res = await fetch(`/api/release/${eventoId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seats: [seatId] })
+        });
+        const data = await res.json();
+        if (data.released && data.released.includes(seatId)) {
+          const el = document.getElementById(`seat-${seatId}`);
+          if (el) {
+            el.className = 'seat disponible';
+            el.title = `${seatId} – disponible`;
+          }
+          document.getElementById('last-scan').textContent = `🔄 ${seatId} liberado`;
+          document.getElementById('last-scan').style.color = 'var(--warning)';
+          cargarEstadisticas();
+        } else {
+          alert('No se pudo liberar el asiento.');
+        }
+      } catch (err) {
+        alert('Error de red.');
+      }
+    });
 
     function validarManual() {
       const seatId = document.getElementById('manual-seat').value.trim().toUpperCase();

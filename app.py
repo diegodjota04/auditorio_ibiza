@@ -1,8 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, Response, g
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, g
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 import sqlite3, os, re, hashlib
+import io, zipfile
+import qrcode
 
 app = Flask(__name__)
 
@@ -303,6 +305,50 @@ def api_buy(evento_id):
     return jsonify({"sold": vendidos, "unavailable": no_disponibles})
 
 
+@app.route("/api/release/<int:evento_id>", methods=["POST"])
+@require_auth
+def api_release(evento_id):
+    data = request.get_json(force=True)
+    seleccionados = data.get("seats", [])
+
+    if not seleccionados or not isinstance(seleccionados, list):
+        return jsonify({"ok": False, "msg": "Lista de asientos inválida"}), 400
+
+    seleccionados = [s for s in seleccionados if isinstance(s, str) and SEAT_RE.match(s)]
+    if not seleccionados:
+        return jsonify({"ok": False, "msg": "IDs de asiento inválidos"}), 400
+
+    seleccionados = seleccionados[:10]
+    released = []
+    failed = []
+
+    con = db_conn()
+    cur = con.cursor()
+    try:
+        con.execute("BEGIN EXCLUSIVE")
+        for sid in seleccionados:
+            cur.execute(
+                "SELECT status FROM asientos WHERE id=? AND evento_id=?",
+                (sid, evento_id),
+            )
+            r = cur.fetchone()
+            if r and r["status"] == "vendido":
+                cur.execute(
+                    "UPDATE asientos SET status='disponible' WHERE id=? AND evento_id=?",
+                    (sid, evento_id),
+                )
+                released.append(sid)
+            else:
+                failed.append(sid)
+        con.commit()
+    except Exception as e:
+        con.rollback()
+        con.close()
+        return jsonify({"ok": False, "msg": f"Error procesando liberación: {e}"}), 500
+    con.close()
+    return jsonify({"released": released, "failed": failed})
+
+
 @app.route("/api/validate/<int:evento_id>", methods=["POST"])
 @require_auth
 def api_validate(evento_id):
@@ -333,6 +379,36 @@ def api_validate(evento_id):
     con.close()
     return jsonify({"ok": True})
 
+
+# --- API para generar QR en ZIP -----------------------------------
+@app.route("/api/qrs/<int:evento_id>")
+@require_auth
+def api_qrs(evento_id):
+    """Genera un ZIP con un PNG de QR por cada asiento del evento."""
+    con = db_conn()
+    cur = con.cursor()
+    cur.execute(
+        "SELECT id FROM asientos WHERE evento_id=? ORDER BY row, num",
+        (evento_id,),
+    )
+    seats = [r["id"] for r in cur.fetchall()]
+    con.close()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for sid in seats:
+            img = qrcode.make(sid)
+            img_byte = io.BytesIO()
+            img.save(img_byte, format="PNG")
+            img_byte.seek(0)
+            zf.writestr(f"{sid}.png", img_byte.read())
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"qr_evento_{evento_id}.zip",
+        mimetype="application/zip",
+    )
 
 @app.route("/api/report/<int:evento_id>")
 @require_auth
