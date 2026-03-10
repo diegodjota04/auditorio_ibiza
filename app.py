@@ -218,7 +218,12 @@ def api_editar_evento(evento_id):
     con.commit()
     con.close()
 
-    if imagen and allowed_image(imagen):
+    if imagen:
+        if not allowed_image(imagen):
+            return jsonify({"ok": False, "msg": "Imagen inválida. Usa JPG, PNG o WebP (máx. 5 MB)"}), 400
+        # make sure folder still exists (it should from create route, but safe to call again)
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+        # overwrite previous image (always save as .jpg to keep URL consistent)
         imagen.save(os.path.join(app.config["UPLOAD_FOLDER"], f"{evento_id}.jpg"))
 
     return jsonify({"ok": True, "msg": "Evento actualizado"})

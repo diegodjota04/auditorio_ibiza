@@ -154,6 +154,7 @@
         if (data.ok) {
           msg.textContent = '✅ Evento actualizado.';
           msg.style.color = 'var(--success)';
+          // force refresh of images by rebuilding calendar after slight delay
           setTimeout(() => { cerrarModal(); cargarCalendario(); }, 800);
         } else {
           msg.textContent = `❌ ${data.msg}`;
@@ -228,7 +229,10 @@
           const id = info.event.extendedProps.id;
           const activo = info.event.extendedProps.activo;
           const img = document.createElement('img');
-          img.src = `/static/eventos/${id}.jpg`;
+          // add a cache‑buster query parameter so that when the event image
+          // is replaced the browser actually fetches the new file instead of
+          // showing a stale cached copy
+          img.src = `/static/eventos/${id}.jpg?t=${Date.now()}`;
           img.loading = 'lazy';
           img.onerror = () => img.style.display = 'none';
           info.el.appendChild(img);
