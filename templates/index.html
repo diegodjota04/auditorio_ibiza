@@ -62,7 +62,7 @@
           imgWrap.className = "evento-img-wrap";
 
           const img = document.createElement("img");
-          img.src = `/static/eventos/${ev.id}.jpg`;
+          img.src = `/static/eventos/${ev.id}.jpg?t=${Date.now()}`;
           img.alt = ev.nombre;
           img.loading = "lazy";
           img.onerror = () => {
