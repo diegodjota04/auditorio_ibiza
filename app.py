@@ -16,7 +16,7 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 # Credenciales por variables de entorno (fallback de desarrollo)
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "ibiza2025")
+ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "ibiza2026")
 
 # Patrón válido para IDs de asientos: A-U seguido de 1-16
 SEAT_RE = re.compile(r"^[A-U]\d{1,2}$")
