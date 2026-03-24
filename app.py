@@ -500,5 +500,4 @@ if __name__ == "__main__":
         from werkzeug.serving import make_ssl_devcert  # type: ignore
         make_ssl_devcert('cert', host='192.168.20.32')
         
-    # Usar '::' permite escuchar tanto en IPv4 como en IPv6 (Dual Stack)
-    app.run(debug=True, host='::', ssl_context=('cert.crt', 'cert.key'))
+    app.run(debug=True, host='0.0.0.0', ssl_context=('cert.crt', 'cert.key'))
