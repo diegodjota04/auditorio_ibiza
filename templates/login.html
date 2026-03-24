@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar Sesión – Auditorio P. Ibiza</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body style="display:flex; justify-content:center; align-items:center; min-height:100vh; background:var(--background);">
+    <div class="panel" style="max-width:400px; width:100%; text-align:center;">
+        <h2>🔐 Acceso Restringido</h2>
+        {% if error %}
+        <p style="color:var(--danger); margin-bottom:1rem;">{{ error }}</p>
+        {% endif %}
+        <form method="POST" action="/login">
+            <div style="margin-bottom:1rem; text-align:left;">
+                <label for="username">Usuario:</label>
+                <input type="text" id="username" name="username" style="width:100%; padding:0.5rem; margin-top:0.2rem;" required autofocus>
+            </div>
+            <div style="margin-bottom:1.5rem; text-align:left;">
+                <label for="password">Contraseña:</label>
+                <input type="password" id="password" name="password" style="width:100%; padding:0.5rem; margin-top:0.2rem;" required>
+            </div>
+            <button type="submit" class="btn" style="width:100%;">Ingresar</button>
+        </form>
+        <div style="margin-top:1rem;">
+            <a href="/" class="nav-link" style="color:var(--text-light); text-decoration:none;">⬅ Volver al inicio</a>
+        </div>
+    </div>
+</body>
+</html>

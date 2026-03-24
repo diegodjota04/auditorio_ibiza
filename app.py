@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, g  # type: ignore
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, g, session, redirect, url_for  # type: ignore
 from werkzeug.utils import secure_filename  # type: ignore
 from datetime import datetime
 from functools import wraps
@@ -7,6 +7,7 @@ import io, zipfile
 import qrcode  # type: ignore
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "super_secret_ibiza_auditorio")
 
 # ─── Configuración ────────────────────────────────────────────────
 app.config["UPLOAD_FOLDER"] = "static/eventos"
@@ -22,23 +23,38 @@ ADMIN_PASS = os.environ.get("ADMIN_PASSWORD", "ibiza2026")
 SEAT_RE = re.compile(r"^[A-U]\d{1,2}$")
 
 
-# ─── Autenticación HTTP Basic ──────────────────────────────────────
+# ─── Autenticación (Sesiones) ──────────────────────────────────────
 def check_auth(username, password):
-    return username == "admin" and password == "ibiza2026"
+    return username == ADMIN_USER and password == ADMIN_PASS
 
 
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return Response(
-                "Acceso restringido. Ingresa tus credenciales de administrador.",
-                401,
-                {"WWW-Authenticate": 'Basic realm="Auditorio Admin"'},
-            )
+        if not session.get("logged_in"):
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "msg": "Sesión expirada"}), 401
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        u = request.form.get("username", "")
+        p = request.form.get("password", "")
+        if check_auth(u, p):
+            session["logged_in"] = True
+            return redirect(url_for('admin'))
+        return render_template("login.html", error="Usuario o contraseña incorrectos")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 
 # ─── Base de datos ─────────────────────────────────────────────────
