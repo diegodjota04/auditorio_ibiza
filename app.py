@@ -477,4 +477,11 @@ def evento_image(filename):
 # ─── Inicio ───────────────────────────────────────────────────────
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True, host='0.0.0.0', ssl_context='adhoc')
+    
+    # Generar certificado permanentemente para que no tarde en iniciar
+    if not os.path.exists('cert.crt') or not os.path.exists('cert.key'):
+        print("Generando certificados SSL temporales por única vez...")
+        from werkzeug.serving import make_ssl_devcert
+        make_ssl_devcert('cert', host='192.168.20.32')
+        
+    app.run(debug=True, host='0.0.0.0', ssl_context=('cert.crt', 'cert.key'))
