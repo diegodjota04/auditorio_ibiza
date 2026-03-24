@@ -70,7 +70,7 @@
   </div>
 
   <script>
-    const eventoId = {{ evento_id | tojson }};
+    const eventoId = "{{ evento_id }}";
     const rows = [...'ABCDEFGHIJKLMNOPQ', ...'RSTU'];
     const maxByRow = {};
     'ABCDEFGHIJKLMNOPQ'.split('').forEach(r => maxByRow[r] = 16);
