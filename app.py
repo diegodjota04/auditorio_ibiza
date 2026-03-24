@@ -481,7 +481,7 @@ if __name__ == "__main__":
     # Generar certificado permanentemente para que no tarde en iniciar
     if not os.path.exists('cert.crt') or not os.path.exists('cert.key'):
         print("Generando certificados SSL temporales por única vez...")
-        from werkzeug.serving import make_ssl_devcert
+        from werkzeug.serving import make_ssl_devcert  # type: ignore
         make_ssl_devcert('cert', host='192.168.20.32')
         
     app.run(debug=True, host='0.0.0.0', ssl_context=('cert.crt', 'cert.key'))
