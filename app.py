@@ -1,10 +1,10 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, g
-from werkzeug.utils import secure_filename
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file, Response, g  # type: ignore
+from werkzeug.utils import secure_filename  # type: ignore
 from datetime import datetime
 from functools import wraps
 import sqlite3, os, re, hashlib
 import io, zipfile
-import qrcode
+import qrcode  # type: ignore
 
 app = Flask(__name__)
 
@@ -277,7 +277,7 @@ def api_buy(evento_id):
         return jsonify({"ok": False, "msg": "IDs de asiento inválidos"}), 400
 
     # Limitar a 10 por transacción
-    seleccionados = seleccionados[:10]
+    seleccionados = seleccionados[:10]  # type: ignore
 
     vendidos = []
     no_disponibles = []
@@ -323,7 +323,7 @@ def api_release(evento_id):
     if not seleccionados:
         return jsonify({"ok": False, "msg": "IDs de asiento inválidos"}), 400
 
-    seleccionados = seleccionados[:10]
+    seleccionados = seleccionados[:10]  # type: ignore
     released = []
     failed = []
 

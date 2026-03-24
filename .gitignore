@@ -1,0 +1,11 @@
+__pycache__/
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.db-lock
+static/eventos/
+*.zip
+*.log
+.env
+my_ip.txt
