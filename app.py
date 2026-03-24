@@ -24,7 +24,7 @@ SEAT_RE = re.compile(r"^[A-U]\d{1,2}$")
 
 # ─── Autenticación HTTP Basic ──────────────────────────────────────
 def check_auth(username, password):
-    return username == ADMIN_USER and password == ADMIN_PASS
+    return username == "admin" and password == "ibiza2026"
 
 
 def require_auth(f):
@@ -477,4 +477,4 @@ def evento_image(filename):
 # ─── Inicio ───────────────────────────────────────────────────────
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')

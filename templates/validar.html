@@ -56,6 +56,10 @@
       <h2>📷 Escáner QR</h2>
       <button class="btn" id="start-scan">▶ Iniciar escaneo</button>
       <button class="btn secondary" id="stop-scan" style="display:none;">⏹ Detener</button>
+      <div id="camera-selection" style="display:none; margin-top:12px;">
+        <label for="camera-select" style="font-size: 0.9rem; color: var(--text-light);">Cámara:</label>
+        <select id="camera-select" style="padding: 0.4rem; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%; margin-top: 4px;"></select>
+      </div>
       <div id="reader" style="display:none; margin-top:12px;"></div>
       <p id="last-scan" style="min-height:2em;"></p>
 
@@ -236,6 +240,9 @@
     document.getElementById('start-scan').addEventListener('click', async () => {
       if (!eventoId) { alert('Selecciona un evento primero.'); return; }
       const readerEl = document.getElementById('reader');
+      const cameraSelectionEl = document.getElementById('camera-selection');
+      const cameraSelect = document.getElementById('camera-select');
+      
       readerEl.style.display = 'block';
       document.getElementById('start-scan').style.display = 'none';
       document.getElementById('stop-scan').style.display = 'inline-flex';
@@ -243,15 +250,31 @@
         if (!html5QrCode) html5QrCode = new Html5Qrcode('reader');
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length) {
+          if (devices.length > 1) {
+            cameraSelectionEl.style.display = 'block';
+            cameraSelect.innerHTML = '';
+            devices.forEach((cam, idx) => {
+              const opt = document.createElement('option');
+              opt.value = cam.id;
+              opt.textContent = cam.label || `Cámara ${idx + 1}`;
+              cameraSelect.appendChild(opt);
+            });
+            
+            cameraSelect.onchange = async () => {
+              try { await html5QrCode.stop(); } catch (e) {}
+              await html5QrCode.start(cameraSelect.value, { fps: 10, qrbox: 250 }, onScanSuccess, () => { });
+            };
+          }
           await html5QrCode.start(devices[0].id, { fps: 10, qrbox: 250 }, onScanSuccess, () => { });
         } else {
           alert('No se encontró cámara disponible.');
         }
       } catch (err) {
         console.error('Error al iniciar escáner:', err);
-        alert('No se pudo iniciar el escáner.');
+        alert('No se pudo iniciar el escáner. Asegúrate de dar permisos de cámara.');
         document.getElementById('start-scan').style.display = 'inline-flex';
         document.getElementById('stop-scan').style.display = 'none';
+        cameraSelectionEl.style.display = 'none';
       }
     });
 
@@ -261,6 +284,7 @@
         html5QrCode = null;
       }
       document.getElementById('reader').style.display = 'none';
+      document.getElementById('camera-selection').style.display = 'none';
       document.getElementById('start-scan').style.display = 'inline-flex';
       document.getElementById('stop-scan').style.display = 'none';
     });
